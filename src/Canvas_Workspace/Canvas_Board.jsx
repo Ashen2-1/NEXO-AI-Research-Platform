@@ -3,6 +3,7 @@ import Header from "./Header.jsx";
 import UploadFile from "../Upload_Section/uploadFile.jsx";
 import DatabaseSearch from "../Upload_Section/databaseSearch.jsx";
 import "./Canvas_Board.css"
+import FrameworkPanel from "./FrameworkPanel.jsx";
 //import { supabase } from "../lib/supabase";
 import { apiRequest } from "../api.js";
 import ReactMarkdown from "react-markdown";
@@ -104,6 +105,30 @@ function CanvasBoard(){
     const [noteDraft, setNoteDraft] = useState("");
     const editorRef = useRef(null);
     const chatBottomRef = useRef(null);
+
+    const [activeToolMode, setActiveToolMode] = useState("canvas");
+
+    const [isFrameworkPanelOpen, setIsFrameworkPanelOpen] = useState(false);
+    const [frameworkStep, setFrameworkStep] = useState("setup"); 
+    // "setup" | "generating" | "output"
+
+    const [frameworkDirection, setFrameworkDirection] = useState("");
+    const [frameworkArgument, setFrameworkArgument] = useState("");
+
+    const [frameworkDetailLevel, setFrameworkDetailLevel] = useState("detailed");
+
+    const [frameworkOptions, setFrameworkOptions] = useState({
+        theoryConcepts: true,
+        claimsEvidence: true,
+        caseStudies: false,
+        researchGaps: true,
+        originalContribution: true,
+        linkClaimsToSources: true,
+    });
+
+    const [currentFramework, setCurrentFramework] = useState(null);
+    const [isFrameworkExpanded, setIsFrameworkExpanded] = useState(false);
+    const [frameworkEditorDraft, setFrameworkEditorDraft] = useState("");
 
     const NOTE_WIDTH = 185; /** Currently I set the width of the note to be 185px */
     const NOTE_HEIGHT = 160; /** Currently I set the Height of the note to be 160px */
@@ -784,6 +809,67 @@ function CanvasBoard(){
         }
     };
     /***************************************************************************/
+    const handleGenerateFramework = async () => {
+        if (selectedNotes.length === 0) {
+            alert("Please select at least one note to generate a framework.");
+            return;
+        }
+
+        setFrameworkStep("generating");
+
+        setTimeout(() => {
+            const mockFramework = {
+                id: Date.now(),
+                title: "Framework V1",
+                status: "Saved",
+                sourceCount: selectedNotes.length,
+                detailLevel: frameworkDetailLevel,
+                sources: selectedFrameworkSources,
+                content: `
+    RESEARCH QUESTION
+    How do the selected sources help construct a research argument?
+
+    WORKING ARGUMENT
+    The selected materials suggest that visual evidence is not neutral. It is shaped by archives, interpretation, absence, and the way sources are connected.
+
+    FRAMEWORK SECTIONS
+
+    01 Key Concepts and Theory
+    - Identify the major concepts in the selected notes.
+    - Explain how these concepts define the research direction.
+
+    02 Claims and Evidence
+    - Extract the strongest claims from the selected sources.
+    - Link each claim to supporting evidence.
+
+    03 Source Relationships
+    - Explain how the selected notes support, extend, challenge, or complicate one another.
+
+    04 Research Gaps
+    - Identify missing evidence, unclear assumptions, or areas requiring further investigation.
+
+    05 Original Contribution
+    - Suggest what new argument or interpretation could emerge from these materials.
+                `.trim(),
+            };
+
+            setCurrentFramework(mockFramework);
+            setFrameworkEditorDraft(mockFramework.content);
+            setFrameworkStep("output");
+        }, 1200);
+    };
+
+
+    const selectedNotes = notes.filter((note) => note.selected);
+
+    const selectedFrameworkSources = selectedNotes.map((note) => ({
+        id: note.id,
+        title: note.title,
+        body: note.body,
+        sourceName: note.sourceName || note.title,
+    }));
+
+
     useEffect(() => {
         loadNotesFromDatabase();
         loadLinksFromDatabase();
@@ -832,10 +918,154 @@ function CanvasBoard(){
             window.removeEventListener("keydown", handleKeyDown);
         };
     }, [notes, links, openedNote]);
+
+    const handleUndo = () => {
+        console.log("Undo clicked");
+    };
+
+    const handleRedo = () => {
+        console.log("Redo clicked");
+    };
+
+    const handleSelectTool = () => {
+        console.log("Select tool clicked");
+    };
+
+    const handlePanTool = () => {
+        console.log("Pan tool clicked");
+    };
+
+    const handleCreateBlankNote = async () => {
+        const newNoteData = {
+            title: "New Note",
+            body: "Write your source text or idea here.",
+            user_note: "",
+            x: 320 + notes.length * 25,
+            y: 140 + notes.length * 25,
+        };
+
+        try {
+            const data = await apiRequest("/notes", {
+                method: "POST",
+                body: JSON.stringify(newNoteData),
+            });
+
+            const newCanvasNote = convertDatabaseNoteToCanvasNote(data.note);
+            setNotes((prevNotes) => [...prevNotes, newCanvasNote]);
+        } catch (error) {
+            console.error("Create blank note error:", error);
+            alert("Failed to create note.");
+        }
+    };
+
+    const handleCluster = () => {
+        alert("Cluster will be added later.");
+    };
+
+    const handleAutoArrange = () => {
+        setNotes((prevNotes) =>
+            prevNotes.map((note, index) => ({
+                ...note,
+                x: 280 + (index % 4) * 220,
+                y: 120 + Math.floor(index / 4) * 190,
+            }))
+        );
+    };
+
+    const handleLockSelected = () => {
+        alert("Lock selected will be added later.");
+    };
+
+    const handlePinTop = () => {
+        alert("Pin top will be added later.");
+    };
+
+    const handleSearchSources = (keyword) => {
+        console.log("Search sources:", keyword);
+    };
+
+    const handlePrepareAiToolPrompt = (promptText) => {
+        setChatInput(promptText);
+        setIsChatOpen(true);
+    };
+
+    const handleAskOnly = () => {
+        handlePrepareAiToolPrompt("Answer only based on the selected sources. ");
+    };
+
+    const handleSummary = () => {
+        handlePrepareAiToolPrompt("Summarize the selected sources clearly. Include the main idea, key arguments, important evidence, and possible research value.");
+    };
+
+    const handleCompare = () => {
+        handlePrepareAiToolPrompt("Compare the selected sources. Explain their similarities, differences, tensions, and how they could be used together in research.");
+    };
+
+    const handleFindEvidence = () => {
+        handlePrepareAiToolPrompt("Find evidence from the selected sources for a possible research argument. Include the source name and why each piece of evidence matters.");
+    };
+
+    const handleFindGaps = () => {
+        handlePrepareAiToolPrompt("Find research gaps in the selected sources. What is missing, unclear, contradictory, or worth further investigation?");
+    };
+
+    const handleOutline = () => {
+        handlePrepareAiToolPrompt("Generate a research outline based on the selected sources. Include a possible thesis, sections, evidence, and conclusion.");
+    };
+
+    const handleSaveProject = () => {
+        alert("Saved.");
+    };
+
+    const handleExportProject = () => {
+        alert("Export will be added later.");
+    };
+
+    const handleShareProject = () => {
+        alert("Share will be added later.");
+    };
+
+    const handleOpenSettings = () => {
+        alert("Settings will be added later.");
+    };
     /***************************************************************************/
     return (
         <div className="Canvas_Page">
-            <Header/>
+            <Header
+                activeToolMode={activeToolMode}
+                setActiveToolMode={setActiveToolMode}
+
+                projectName="NEXO"
+                projectSubtitle="Photography and Evidence"
+                saveStatus="Saved"
+
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                onSelectTool={handleSelectTool}
+                onDeleteSelected={handleDeleteSelectedNote}
+                onPanTool={handlePanTool}
+                onCreateNote={handleCreateBlankNote}
+                onLinkSelected={handleLinkSelectedNotes}
+                onUpload={() => setShowUploadModal(true)}
+                onCluster={handleCluster}
+                onAutoArrange={handleAutoArrange}
+                onLockSelected={handleLockSelected}
+                onPinTop={handlePinTop}
+
+                onSearchSources={handleSearchSources}
+                onAskOnly={handleAskOnly}
+                onSummary={handleSummary}
+                onCompare={handleCompare}
+                onFindEvidence={handleFindEvidence}
+                onFindGaps={handleFindGaps}
+                onFramework={() => {setIsFrameworkPanelOpen(true);setFrameworkStep("setup");setIsChatOpen(true);}}
+                onOutline={handleOutline}
+
+                onSave={handleSaveProject}
+                onExport={handleExportProject}
+                onShare={handleShareProject}
+                onSettings={handleOpenSettings}
+            />
             <main className="Canvas_Main">
                 <button className="Logout_Button" onClick={handleLogout}>Logout {currentUser?.email ? `(${currentUser.email})` : ""}</button>
                 <button className="Database_Button" onClick={() => setShowDatabaseSearch(true)}>
@@ -955,103 +1185,131 @@ function CanvasBoard(){
                         className="Chat_Toggle_Button"
                         onClick={() => setIsChatOpen((prev) => !prev)}
                     >
-                        {isChatOpen ? <AiOutlineDoubleRight className="DoubleLeft"/> : <AiOutlineDoubleLeft className="DoubleRight"/>}
+                        {isChatOpen ? (
+                            <AiOutlineDoubleRight className="DoubleLeft" />
+                        ) : (
+                            <AiOutlineDoubleLeft className="DoubleRight" />
+                        )}
                     </button>
 
                     {isChatOpen && (
                         <>
-                        <div className="Chat_Header">
-                            <h2>Start Chatting</h2>
-                        </div>
-
-                        <div className="Chat_Body">
-                            {chatMessages.length === 0 ? (
-                            selectedNotesCount === 0 ? (
-                                <p className="Chat_Empty_Text">
-                                Ask a general question, or select a note to ask based on sources.
-                                </p>
+                            {isFrameworkPanelOpen ? (
+                                <FrameworkPanel
+                                    step={frameworkStep}
+                                    selectedNotes={selectedNotes}
+                                    frameworkDirection={frameworkDirection}
+                                    setFrameworkDirection={setFrameworkDirection}
+                                    frameworkArgument={frameworkArgument}
+                                    setFrameworkArgument={setFrameworkArgument}
+                                    frameworkDetailLevel={frameworkDetailLevel}
+                                    setFrameworkDetailLevel={setFrameworkDetailLevel}
+                                    frameworkOptions={frameworkOptions}
+                                    setFrameworkOptions={setFrameworkOptions}
+                                    currentFramework={currentFramework}
+                                    frameworkEditorDraft={frameworkEditorDraft}
+                                    setFrameworkEditorDraft={setFrameworkEditorDraft}
+                                    onGenerate={handleGenerateFramework}
+                                    onClose={() => setIsFrameworkPanelOpen(false)}
+                                    onExpand={() => setIsFrameworkExpanded(true)}
+                                    onConvertToOutline={() => alert("Convert to Outline will be added next.")}
+                                />
                             ) : (
-                                <div className="Chat_Active_State">
-                                <p className="Chat_Context_Text">
-                                    AI will answer based on {selectedNotesCount} selected note(s).
-                                </p>
-
-                                <div className="Chat_Message Chat_Message_AI">
-                                    Ask a grounded question about the selected source notes.
-                                </div>
-                                </div>
-                            )
-                            ) : (
-                            <div className="Chat_Message_List">
-                                {chatMessages.map((message) => (
-                                <div
-                                    className={`Chat_Message_Row ${
-                                    message.role === "user"
-                                        ? "Chat_Message_Row_User"
-                                        : "Chat_Message_Row_AI"
-                                    }`}
-                                    key={message.id}
-                                >
-                                    <div className="Chat_Message_Label">
-                                    {message.role === "user" ? "User" : "AI"}
+                                <>
+                                    <div className="Chat_Header">
+                                        <h2>Start Chatting</h2>
                                     </div>
 
-                                    <div
-                                    className={`Chat_Message ${
-                                        message.role === "user"
-                                        ? "Chat_Message_User"
-                                        : "Chat_Message_AI"
-                                    }`}
-                                    >
-                                        {message.role === "ai" ? (
-                                            <div className="Chat_Message_Text">
-                                                <ReactMarkdown>{message.text}</ReactMarkdown>
-                                            </div>
-                                        ) : ( 
-                                            <div className="Chat_Message_Text">
-                                                {message.text}
+                                    <div className="Chat_Body">
+                                        {chatMessages.length === 0 ? (
+                                            selectedNotesCount === 0 ? (
+                                                <p className="Chat_Empty_Text">
+                                                    Ask a general question, or select a note to ask based on sources.
+                                                </p>
+                                            ) : (
+                                                <div className="Chat_Active_State">
+                                                    <p className="Chat_Context_Text">
+                                                        AI will answer based on {selectedNotesCount} selected note(s).
+                                                    </p>
+
+                                                    <div className="Chat_Message Chat_Message_AI">
+                                                        Ask a grounded question about the selected source notes.
+                                                    </div>
+                                                </div>
+                                            )
+                                        ) : (
+                                            <div className="Chat_Message_List">
+                                                {chatMessages.map((message) => (
+                                                    <div
+                                                        className={`Chat_Message_Row ${
+                                                            message.role === "user"
+                                                                ? "Chat_Message_Row_User"
+                                                                : "Chat_Message_Row_AI"
+                                                        }`}
+                                                        key={message.id}
+                                                    >
+                                                        <div className="Chat_Message_Label">
+                                                            {message.role === "user" ? "User" : "AI"}
+                                                        </div>
+
+                                                        <div
+                                                            className={`Chat_Message ${
+                                                                message.role === "user"
+                                                                    ? "Chat_Message_User"
+                                                                    : "Chat_Message_AI"
+                                                            }`}
+                                                        >
+                                                            {message.role === "ai" ? (
+                                                                <div className="Chat_Message_Text">
+                                                                    <ReactMarkdown>{message.text}</ReactMarkdown>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="Chat_Message_Text">
+                                                                    {message.text}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+
+                                                {isAiThinking && (
+                                                    <div className="Chat_Message_Row Chat_Message_Row_AI">
+                                                        <div className="Chat_Message_Label">AI</div>
+                                                        <div className="Chat_Message Chat_Message_AI">
+                                                            AI is thinking...
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div ref={chatBottomRef} />
                                             </div>
                                         )}
-                                    
                                     </div>
-                                </div>
-                                ))}
 
-                                {isAiThinking && (
-                                <div className="Chat_Message_Row Chat_Message_Row_AI">
-                                    <div className="Chat_Message_Label">AI</div>
-                                    <div className="Chat_Message Chat_Message_AI">
-                                    AI is thinking...
+                                    <div className="Chat_Input_Bar">
+                                        <input
+                                            className="Chat_Input"
+                                            placeholder={
+                                                selectedNotesCount > 0
+                                                    ? "Ask about selected notes..."
+                                                    : "Ask a general question..."
+                                            }
+                                            value={chatInput}
+                                            onChange={(event) => setChatInput(event.target.value)}
+                                            onKeyDown={handleChatKeyDown}
+                                            disabled={isAiThinking}
+                                        />
+
+                                        <button
+                                            className="Chat_Send_Button"
+                                            onClick={handleSendMessage}
+                                            disabled={isAiThinking || !chatInput.trim()}
+                                        >
+                                            <VscArrowUp />
+                                        </button>
                                     </div>
-                                </div>
-                                )}
-                                <div ref={chatBottomRef} />
-                            </div>
+                                </>
                             )}
-                        </div>
-
-                        <div className="Chat_Input_Bar">
-                            <input
-                            className="Chat_Input"
-                            placeholder={
-                                selectedNotesCount > 0
-                                ? "Ask about selected notes..."
-                                : "Ask a general question..."
-                            }
-                            value={chatInput}
-                            onChange={(event) => setChatInput(event.target.value)}
-                            onKeyDown={handleChatKeyDown}
-                            disabled={isAiThinking}
-                            />
-
-                            <button
-                            className="Chat_Send_Button"
-                            onClick={handleSendMessage}
-                            disabled={isAiThinking || !chatInput.trim()}
-                            >
-                            <VscArrowUp />
-                            </button>
-                        </div>
                         </>
                     )}
                 </aside>
@@ -1141,7 +1399,76 @@ function CanvasBoard(){
                     </div>
                 </div>
             )}
+
+
+
+            {isFrameworkExpanded && currentFramework && (
+                <div className="Framework_Expanded_Overlay">
+                    <div className="Framework_Expanded_Modal">
+                        <div className="Framework_Expanded_Header">
+                            <div>
+                                <p>FRAMEWORK OUTPUT · EDITABLE</p>
+                                <h2>{currentFramework.title}</h2>
+                            </div>
+
+                            <div className="Framework_Expanded_Header_Actions">
+                                <span>SAVED</span>
+                                <button type="button" onClick={() => setIsFrameworkExpanded(false)}>
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="Framework_Expanded_Body">
+                            <aside className="Framework_Expanded_Nav">
+                                <p>DOCUMENT OUTLINE</p>
+                                <button>RQ Research direction</button>
+                                <button>01 Index & evidence</button>
+                                <button>02 Archive & power</button>
+                                <button>03 Research gap</button>
+
+                                <div className="Framework_Linked_Sources">
+                                    <p>LINKED SOURCES</p>
+                                    {currentFramework.sources.map((source) => (
+                                        <span key={source.id}>● {source.title}</span>
+                                    ))}
+                                </div>
+                            </aside>
+
+                            <main className="Framework_Expanded_Editor">
+                                <div className="Framework_Expanded_Toolbar">
+                                    <button>Paragraph</button>
+                                    <button><b>B</b></button>
+                                    <button><i>I</i></button>
+                                    <button>Comment</button>
+                                </div>
+
+                                <textarea
+                                    value={frameworkEditorDraft}
+                                    onChange={(event) => setFrameworkEditorDraft(event.target.value)}
+                                />
+                            </main>
+                        </div>
+
+                        <div className="Framework_Expanded_Footer">
+                            <span>{frameworkEditorDraft.length} characters · All changes saved</span>
+
+                            <div>
+                                <button type="button" onClick={() => setIsFrameworkExpanded(false)}>
+                                    Done editing
+                                </button>
+
+                                <button type="button" className="Dark">
+                                    Convert to Outline
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
+
+        
     );
 }
 

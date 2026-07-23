@@ -1,0 +1,290 @@
+.Framework_Panel {
+    width: 100%;
+    height: 100%;
+    background: #ffffff;
+    border-left: 1px solid #d5d5d5;
+    display: flex;
+    flex-direction: column;
+    font-family: Inter, Arial, Helvetica, sans-serif;
+}
+
+.Framework_Panel_Header {
+    height: 76px;
+    background: #3f3f3f;
+    color: white;
+    padding: 16px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.Framework_Panel_Header p {
+    margin: 0 0 4px 0;
+    font-size: 10px;
+    color: #cfcfcf;
+    letter-spacing: 1px;
+}
+
+.Framework_Panel_Header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.Framework_Panel_Header button {
+    border: none;
+    background: transparent;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.Framework_Setup,
+.Framework_Output {
+    padding: 18px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.Framework_Card {
+    position: relative;
+    border: 1px solid #dddddd;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+    background: white;
+}
+
+.Framework_Label {
+    margin: 0 0 10px 0;
+    font-size: 10px;
+    color: #777;
+    letter-spacing: 1px;
+    font-weight: 700;
+}
+
+.Framework_Card strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.Framework_Card span {
+    font-size: 12px;
+    color: #777;
+}
+
+.Framework_Change_Button {
+    position: absolute;
+    right: 12px;
+    top: 22px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.Framework_Card textarea {
+    width: 100%;
+    min-height: 70px;
+    resize: vertical;
+    border: none;
+    background: #f1f1f1;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    outline: none;
+}
+
+.Framework_Hint {
+    margin: 0;
+    font-size: 11px;
+    color: #777;
+}
+
+.Framework_Segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: #f2f2f2;
+    border-radius: 9px;
+    padding: 3px;
+    margin-bottom: 12px;
+}
+
+.Framework_Segmented button {
+    border: none;
+    background: transparent;
+    border-radius: 7px;
+    padding: 8px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.Framework_Segmented button.Active {
+    background: #444;
+    color: white;
+}
+
+.Framework_Option_Grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.Framework_Option_Grid button {
+    border: 1px solid #dddddd;
+    background: #f7f7f7;
+    border-radius: 8px;
+    padding: 9px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.Framework_Option_Grid button.Active {
+    background: #e9e9e9;
+    border-color: #333;
+}
+
+.Framework_Toggle_Row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f2f2f2;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 12px;
+}
+
+.Framework_Footer_Summary {
+    text-align: center;
+    color: #777;
+    font-size: 12px;
+    margin: 14px 0 10px 0;
+}
+
+.Framework_Primary_Button {
+    width: 100%;
+    height: 44px;
+    border: none;
+    background: #444;
+    color: white;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.Framework_Primary_Button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.Framework_Generating {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+    padding: 30px;
+}
+
+.Framework_Loading_Dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: #111;
+    animation: frameworkPulse 1s infinite ease-in-out;
+}
+
+@keyframes frameworkPulse {
+    0% { opacity: 0.25; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.15); }
+    100% { opacity: 0.25; transform: scale(0.8); }
+}
+
+.Framework_Output_Card {
+    border: 1px solid #dddddd;
+    border-radius: 10px;
+    padding: 12px;
+    background: #f9f9f9;
+}
+
+.Framework_Output_Top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.Framework_Output_Top p {
+    margin: 0 0 3px 0;
+    font-size: 10px;
+    color: #777;
+}
+
+.Framework_Output_Top strong {
+    font-size: 13px;
+}
+
+.Framework_Output_Top button {
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+}
+
+.Framework_Mini_Toolbar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.Framework_Mini_Toolbar button {
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 7px;
+    padding: 6px 9px;
+    font-size: 12px;
+}
+
+.Framework_Editor_Textarea {
+    width: 100%;
+    min-height: 390px;
+    resize: vertical;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 12px;
+    background: white;
+    font-size: 12px;
+    line-height: 1.5;
+    outline: none;
+}
+
+.Framework_Output_Footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.Framework_Output_Footer span {
+    font-size: 11px;
+    color: #777;
+}
+
+.Framework_Output_Footer button {
+    border: none;
+    background: #444;
+    color: white;
+    border-radius: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+}
