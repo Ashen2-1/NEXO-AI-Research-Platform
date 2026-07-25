@@ -140,6 +140,9 @@ function CanvasBoard(){
     const [isFrameworkRefining, setIsFrameworkRefining] = useState(false);
     const [isConvertingOutline, setIsConvertingOutline] = useState(false);
 
+    const [undoStack, setUndoStack] = useState([]);
+    const [redoStack, setRedoStack] = useState([]);
+
     const frameworkLastSavedContentRef = useRef("");
     const frameworkLatestDraftRef = useRef("");
     const frameworkGenerationAbortRef = useRef(null);
@@ -171,6 +174,35 @@ function CanvasBoard(){
 
     //     setNotes(formattedNotes);
     // };
+    const getSnapshot = () => ({
+        notes: notes.map(n => ({ id: n.id, x: n.x, y: n.y })),
+        boardOffset,
+        boardScale,
+    });
+
+    const applySnapshot = async (snapshot) => {
+        // 更新 UI
+        setNotes(prev =>
+            prev.map(note => {
+                const saved = snapshot.notes.find(n => n.id === note.id);
+                return saved ? { ...note, x: saved.x, y: saved.y } : note;
+            })
+        );
+    
+        setBoardOffset(snapshot.boardOffset);
+        setBoardScale(snapshot.boardScale);
+    
+        // 同步数据库（只更新位置）
+        await Promise.all(
+            snapshot.notes.map(n =>
+                updateNoteInDatabase(n.id, {
+                    x: n.x,
+                    y: n.y,
+                })
+            )
+        );
+    };
+
     /** When file upload success it will be package in the way we want so later can put into the PGSQL*/
     const handleUploadSuccess = async (uploadedFile, uploadResult) => {
         const newNoteData = {
@@ -496,6 +528,9 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const handleNoteMouseDown = (event, note) => {
+        setUndoStack(stack => [...stack, getSnapshot()]);
+        setRedoStack([]);
+
         event.stopPropagation();
 
         const canvasRect = event.currentTarget.closest(".Canvas_Center").getBoundingClientRect();
@@ -554,6 +589,11 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const handleCanvasWheel = (event) => {
+        if (undoStack.length === 0 || undoStack[undoStack.length - 1]._zoom !== true) {
+            setUndoStack(stack => [...stack, { ...getSnapshot(), _zoom: true }]);
+            setRedoStack([]);
+        }
+
         event.preventDefault();
 
         const zoomSpeed = 0.0015;
@@ -590,6 +630,9 @@ function CanvasBoard(){
             return;
         }
 
+        setUndoStack(stack => [...stack, getSnapshot()]);
+        setRedoStack([]);
+
         setIsPanningBoard(true);
         setPanStart({
             x: event.clientX - boardOffset.x,
@@ -598,6 +641,9 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const handleResetView = () => {
+        setUndoStack(stack => [...stack, getSnapshot()]);
+        setRedoStack([]);
+    
         setBoardOffset({ x: 0, y: 0 });
         setBoardScale(1);
     };
@@ -1528,12 +1574,26 @@ ${frameworkEditorDraft.slice(0, 60000)}
         };
     }, [notes, links, openedNote]);
 
-    const handleUndo = () => {
-        console.log("Undo clicked");
+    const handleUndo = async () => {
+        if (undoStack.length === 0) return;
+
+        const prev = undoStack[undoStack.length - 1];
+
+        setUndoStack(stack => stack.slice(0, -1));
+        setRedoStack(stack => [...stack, getSnapshot()]);
+
+        await applySnapshot(prev);
     };
 
-    const handleRedo = () => {
-        console.log("Redo clicked");
+    const handleRedo = async () => {
+        if (redoStack.length === 0) return;
+    
+        const next = redoStack[redoStack.length - 1];
+    
+        setRedoStack(stack => stack.slice(0, -1));
+        setUndoStack(stack => [...stack, getSnapshot()]);
+    
+        await applySnapshot(next);
     };
 
     const handleSelectTool = () => {
@@ -1571,13 +1631,25 @@ ${frameworkEditorDraft.slice(0, 60000)}
         alert("Cluster will be added later.");
     };
 
-    const handleAutoArrange = () => {
-        setNotes((prevNotes) =>
-            prevNotes.map((note, index) => ({
-                ...note,
-                x: 280 + (index % 4) * 220,
-                y: 120 + Math.floor(index / 4) * 190,
-            }))
+    const handleAutoArrange = async () => {
+        setUndoStack(stack => [...stack, getSnapshot()]);
+        setRedoStack([]);
+    
+        const updated = notes.map((note, index) => ({
+            ...note,
+            x: 280 + (index % 4) * 220,
+            y: 120 + Math.floor(index / 4) * 190,
+        }));
+    
+        setNotes(updated);
+    
+        await Promise.all(
+            updated.map(n =>
+                updateNoteInDatabase(n.id, {
+                    x: n.x,
+                    y: n.y,
+                })
+            )
         );
     };
 
