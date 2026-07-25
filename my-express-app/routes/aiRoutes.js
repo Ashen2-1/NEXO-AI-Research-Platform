@@ -3,6 +3,46 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
+const getFastApiBaseUrl = () => {
+    const configuredUrl = process.env.FASTAPI_BASE_URL?.trim();
+
+    // The existing local AI service in this project normally runs on port 8000.
+    // An environment value, when present, still takes priority.
+    return (configuredUrl || "http://127.0.0.1:8000").replace(/\/+$/, "");
+};
+
+const buildFastApiHeaders = () => {
+    const headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+    };
+
+    const apiKey = process.env.FASTAPI_API_KEY?.trim();
+
+    // Do not send an "undefined" key. Local FastAPI setups that do not require
+    // an API key can therefore work without adding a new .env value.
+    if (apiKey) {
+        headers["X-API-Key"] = apiKey;
+    }
+
+    return headers;
+};
+
+const parseUpstreamResponse = async (response) => {
+    const responseText = await response.text();
+
+    if (!responseText) {
+        return {};
+    }
+
+    try {
+        return JSON.parse(responseText);
+    } catch {
+        return {
+            detail: responseText.replace(/\s+/g, " ").slice(0, 500),
+        };
+    }
+};
+
 router.post("/query-text", authMiddleware, async (req, res) => {
     const {
         question,
@@ -20,47 +60,51 @@ router.post("/query-text", authMiddleware, async (req, res) => {
         });
     }
 
-    try {
-        const formData = new URLSearchParams();
-        formData.append("question", question);
-        formData.append("chat_history", JSON.stringify(chat_history));
+    const formData = new URLSearchParams();
+    formData.append("question", question);
+    formData.append("chat_history", JSON.stringify(chat_history));
 
-        let endpoint = "/query/general";
+    let endpoint = "/query/general";
 
-        if (shouldUseRag) {
-            endpoint = "/query/text";
-            formData.append("top_k", String(top_k));
+    if (shouldUseRag) {
+        endpoint = "/query/text";
+        formData.append("top_k", String(top_k));
 
-            if (source_filter) {
-                formData.append("source_filter", source_filter);
-            }
+        if (source_filter) {
+            formData.append("source_filter", source_filter);
         }
+    }
 
-        console.log("AI ROUTE DEBUG:", {
-            question,
-            shouldUseRag,
-            endpoint,
-            historyCount: Array.isArray(chat_history) ? chat_history.length : 0,
-        });
+    const fastApiBaseUrl = getFastApiBaseUrl();
+    const targetUrl = `${fastApiBaseUrl}${endpoint}`;
 
-        const response = await fetch(`${process.env.FASTAPI_BASE_URL}${endpoint}`, {
+    console.log("AI ROUTE DEBUG:", {
+        shouldUseRag,
+        endpoint,
+        sourceFilter: source_filter || null,
+        historyCount: Array.isArray(chat_history) ? chat_history.length : 0,
+        targetUrl,
+    });
+
+    try {
+        const response = await fetch(targetUrl, {
             method: "POST",
-            headers: {
-                "X-API-Key": process.env.FASTAPI_API_KEY,
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
+            headers: buildFastApiHeaders(),
             body: formData.toString(),
         });
 
-        const data = await response.json();
+        const data = await parseUpstreamResponse(response);
 
         if (!response.ok) {
             return res.status(response.status).json({
-                error: data.detail || data.error || "FastAPI query failed.",
+                error:
+                    data.detail ||
+                    data.error ||
+                    `AI service returned status ${response.status}.`,
             });
         }
 
-        res.json({
+        return res.json({
             answer: data.answer,
             sources: data.sources || [],
             mode: data.mode,
@@ -69,8 +113,10 @@ router.post("/query-text", authMiddleware, async (req, res) => {
     } catch (error) {
         console.error("AI query error:", error);
 
-        res.status(500).json({
-            error: "Server error while calling FastAPI.",
+        return res.status(502).json({
+            error:
+                `Could not reach the AI service at ${fastApiBaseUrl}. ` +
+                "Start the existing FastAPI service or set FASTAPI_BASE_URL to its address.",
         });
     }
 });

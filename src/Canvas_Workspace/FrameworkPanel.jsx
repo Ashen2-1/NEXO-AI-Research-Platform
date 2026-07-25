@@ -17,10 +17,22 @@ function FrameworkPanel({
     setFrameworkOptions,
 
     currentFramework,
+    frameworkVersions,
     frameworkEditorDraft,
     setFrameworkEditorDraft,
+    frameworkSaveStatus,
+    generationError,
+
+    refinementPrompt,
+    setRefinementPrompt,
+    isRefining,
+    isConvertingOutline,
 
     onGenerate,
+    onCancelGeneration,
+    onCreateNew,
+    onSelectVersion,
+    onRefine,
     onClose,
     onExpand,
     onConvertToOutline,
@@ -30,6 +42,20 @@ function FrameworkPanel({
             ...prev,
             [key]: !prev[key],
         }));
+    };
+
+    const saveStatusLabel = {
+        editing: "Editing",
+        saving: "Saving...",
+        saved: "Saved",
+        error: "Save error",
+    }[frameworkSaveStatus] || "Saved";
+
+    const handleRefineKeyDown = (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            onRefine();
+        }
     };
 
     return (
@@ -42,19 +68,29 @@ function FrameworkPanel({
                     </h2>
                 </div>
 
-                <button type="button" onClick={onClose}>
+                <button type="button" onClick={onClose} aria-label="Close Framework">
                     ×
                 </button>
             </div>
 
             {step === "setup" && (
                 <div className="Framework_Setup">
+                    {generationError && (
+                        <div className="Framework_Error_Banner" role="alert">
+                            {generationError}
+                        </div>
+                    )}
+
                     <div className="Framework_Card">
                         <p className="Framework_Label">INPUT MATERIALS</p>
                         <strong>{selectedNotes.length} selected notes</strong>
                         <span>Workspace + Cabinet</span>
 
-                        <button type="button" className="Framework_Change_Button">
+                        <button
+                            type="button"
+                            className="Framework_Change_Button"
+                            onClick={onClose}
+                        >
                             Change
                         </button>
                     </div>
@@ -153,7 +189,7 @@ function FrameworkPanel({
                     </div>
 
                     <div className="Framework_Footer_Summary">
-                        {selectedNotes.length} notes · {frameworkDetailLevel} · source-linked
+                        {selectedNotes.length} notes · {frameworkDetailLevel} · {frameworkOptions.linkClaimsToSources ? "source-linked" : "no source links"}
                     </div>
 
                     <button
@@ -171,22 +207,67 @@ function FrameworkPanel({
                 <div className="Framework_Generating">
                     <div className="Framework_Loading_Dot"></div>
                     <h3>Generating Framework...</h3>
-                    <p>Organizing notes, mapping evidence, and identifying gaps.</p>
+                    <p>
+                        Reading each selected source, mapping evidence, and identifying gaps.
+                    </p>
+                    <button
+                        type="button"
+                        className="Framework_Secondary_Button"
+                        onClick={onCancelGeneration}
+                    >
+                        Cancel
+                    </button>
                 </div>
             )}
 
             {step === "output" && currentFramework && (
                 <div className="Framework_Output">
+                    {generationError && (
+                        <div className="Framework_Error_Banner" role="alert">
+                            {generationError}
+                        </div>
+                    )}
+
                     <div className="Framework_Output_Card">
                         <div className="Framework_Output_Top">
                             <div>
-                                <p>FRAMEWORK V1</p>
-                                <strong>Editing</strong>
+                                <p>{currentFramework.title}</p>
+                                <strong>{saveStatusLabel}</strong>
                             </div>
 
-                            <button type="button" onClick={onExpand}>
-                                ↗ Expand
-                            </button>
+                            <div className="Framework_Output_Actions">
+                                <button type="button" onClick={onCreateNew}>
+                                    + New
+                                </button>
+                                <button type="button" onClick={onExpand}>
+                                    ↗ Expand
+                                </button>
+                            </div>
+                        </div>
+
+                        {frameworkVersions.length > 0 && (
+                            <label className="Framework_Version_Row">
+                                <span>Version history</span>
+                                <select
+                                    value={currentFramework.id || ""}
+                                    onChange={(event) => onSelectVersion(event.target.value)}
+                                >
+                                    {!currentFramework.id && (
+                                        <option value="">Unsaved version</option>
+                                    )}
+                                    {frameworkVersions.map((framework) => (
+                                        <option key={framework.id} value={framework.id}>
+                                            {framework.title}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        )}
+
+                        <div className="Framework_Source_Summary">
+                            {(currentFramework.sources || []).map((source) => (
+                                <span key={source.id}>{source.title}</span>
+                            ))}
                         </div>
 
                         <div className="Framework_Mini_Toolbar">
@@ -203,10 +284,39 @@ function FrameworkPanel({
                             onChange={(event) => setFrameworkEditorDraft(event.target.value)}
                         />
 
+                        <div className="Framework_Refine_Box">
+                            <p className="Framework_Label">REFINE WITH AI</p>
+                            <div className="Framework_Refine_Row">
+                                <input
+                                    type="text"
+                                    value={refinementPrompt}
+                                    onChange={(event) => setRefinementPrompt(event.target.value)}
+                                    onKeyDown={handleRefineKeyDown}
+                                    placeholder="Example: strengthen section 2 and mark unsupported claims"
+                                    disabled={isRefining}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={onRefine}
+                                    disabled={isRefining || !refinementPrompt.trim()}
+                                >
+                                    {isRefining ? "Revising..." : "Apply"}
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="Framework_Output_Footer">
-                            <span>{frameworkEditorDraft.length} characters · Saved</span>
-                            <button type="button" onClick={onConvertToOutline}>
-                                Convert to Outline
+                            <span>
+                                {frameworkEditorDraft.length} characters · {saveStatusLabel}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={onConvertToOutline}
+                                disabled={isConvertingOutline}
+                            >
+                                {isConvertingOutline
+                                    ? "Converting..."
+                                    : "Convert to Outline"}
                             </button>
                         </div>
                     </div>

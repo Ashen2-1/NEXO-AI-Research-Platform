@@ -22,6 +22,9 @@ import { FaListUl } from "react-icons/fa";
 import { FaListOl } from "react-icons/fa";
 
 
+const FRAMEWORK_STORAGE_SOURCE = "__nexo_framework__";
+const OUTLINE_STORAGE_SOURCE = "__nexo_outline__";
+
 function CanvasBoard(){
 
     const currentUser = JSON.parse(localStorage.getItem("nexo_user") || "null");
@@ -127,8 +130,18 @@ function CanvasBoard(){
     });
 
     const [currentFramework, setCurrentFramework] = useState(null);
+    const [frameworkVersions, setFrameworkVersions] = useState([]);
     const [isFrameworkExpanded, setIsFrameworkExpanded] = useState(false);
     const [frameworkEditorDraft, setFrameworkEditorDraft] = useState("");
+    const [frameworkSaveStatus, setFrameworkSaveStatus] = useState("saved");
+    const [frameworkGenerationError, setFrameworkGenerationError] = useState("");
+    const [frameworkRefinementPrompt, setFrameworkRefinementPrompt] = useState("");
+    const [isFrameworkRefining, setIsFrameworkRefining] = useState(false);
+    const [isConvertingOutline, setIsConvertingOutline] = useState(false);
+
+    const frameworkLastSavedContentRef = useRef("");
+    const frameworkLatestDraftRef = useRef("");
+    const frameworkGenerationAbortRef = useRef(null);
 
     const NOTE_WIDTH = 185; /** Currently I set the width of the note to be 185px */
     const NOTE_HEIGHT = 160; /** Currently I set the Height of the note to be 160px */
@@ -707,6 +720,18 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const convertDatabaseNoteToCanvasNote = (note) => {
+        const sourceType = note.source_type || "pdf";
+        const sourceName = note.source_name || note.title;
+
+        const noteKind =
+            sourceType === "framework" ||
+            sourceName === FRAMEWORK_STORAGE_SOURCE ||
+            sourceName === "nexo-framework"
+                ? "framework"
+                : sourceType === "outline" || sourceName === OUTLINE_STORAGE_SOURCE
+                  ? "outline"
+                  : sourceType;
+
         return {
             id: note.id,
             title: note.title,
@@ -716,15 +741,156 @@ function CanvasBoard(){
             y: Number(note.y),
             selected: false,
 
-            sourceType: note.source_type || "pdf",
-            sourceName: note.source_name || note.title,
+            sourceType,
+            sourceName,
+            noteKind,
             fileUrl: note.file_url || "",
             fileSize: note.file_size || null,
             chunksAdded: note.chunks_added || null,
             dbTotal: note.db_total || null,
             createdAt: note.created_at,
+            updatedAt: note.updated_at,
         };
     };
+    /***************************************************************************/
+    const parseFrameworkMetadata = (metadataText) => {
+        if (!metadataText) {
+            return {};
+        }
+
+        try {
+            const parsed = JSON.parse(metadataText);
+            return parsed && typeof parsed === "object" ? parsed : {};
+        } catch (error) {
+            console.warn("Could not parse saved framework metadata:", error);
+            return {};
+        }
+    };
+
+    const getFrameworkVersionNumber = (frameworkNote, metadata = {}) => {
+        if (Number.isFinite(Number(metadata.version))) {
+            return Number(metadata.version);
+        }
+
+        const titleMatch = String(frameworkNote.title || "").match(/framework\s+v(\d+)/i);
+        return titleMatch ? Number(titleMatch[1]) : 1;
+    };
+
+    const convertFrameworkNoteToFramework = (frameworkNote) => {
+        const metadata = parseFrameworkMetadata(frameworkNote.userNote);
+        const version = getFrameworkVersionNumber(frameworkNote, metadata);
+
+        return {
+            id: frameworkNote.id,
+            title: frameworkNote.title || `Framework V${version}`,
+            version,
+            status: "Saved",
+            sourceCount: Array.isArray(metadata.sources) ? metadata.sources.length : 0,
+            detailLevel: metadata.detailLevel || "detailed",
+            sources: Array.isArray(metadata.sources) ? metadata.sources : [],
+            direction: metadata.direction || "",
+            argument: metadata.argument || "",
+            options: metadata.options || {},
+            content: frameworkNote.body || "",
+            createdAt: frameworkNote.createdAt,
+            updatedAt: frameworkNote.updatedAt,
+        };
+    };
+
+    const sortFrameworkVersions = (frameworks) => {
+        return [...frameworks].sort((a, b) => {
+            if (b.version !== a.version) {
+                return b.version - a.version;
+            }
+
+            return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
+    };
+
+    const escapeHtml = (value) => {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    };
+
+    const plainTextToEditorHtml = (value) => {
+        return `<pre>${escapeHtml(value)}</pre>`;
+    };
+
+    const stripHtml = (value) => {
+        return String(value || "")
+            .replace(/<[^>]*>/g, " ")
+            .replace(/&nbsp;/gi, " ")
+            .replace(/&amp;/gi, "&")
+            .replace(/&lt;/gi, "<")
+            .replace(/&gt;/gi, ">")
+            .replace(/\s+/g, " ")
+            .trim();
+    };
+
+    const requestAiText = async ({
+        question,
+        useRag = false,
+        sourceFilter = "",
+        topK = 5,
+        signal,
+    }) => {
+        const data = await apiRequest("/ai/query-text", {
+            method: "POST",
+            ...(signal ? { signal } : {}),
+            body: JSON.stringify({
+                question,
+                top_k: topK,
+                use_rag: useRag,
+                source_filter: sourceFilter,
+                chat_history: [],
+            }),
+        });
+
+        const answer = String(data.answer || "").trim();
+
+        if (!answer) {
+            throw new Error("The AI service returned an empty response.");
+        }
+
+        return {
+            answer,
+            sources: Array.isArray(data.sources) ? data.sources : [],
+            mode: data.mode,
+        };
+    };
+
+    const getFrameworkModuleLabels = () => {
+        const labels = [];
+
+        if (frameworkOptions.theoryConcepts) labels.push("theory and key concepts");
+        if (frameworkOptions.claimsEvidence) labels.push("claims and evidence");
+        if (frameworkOptions.caseStudies) labels.push("case studies");
+        if (frameworkOptions.researchGaps) labels.push("research gaps");
+        if (frameworkOptions.originalContribution) labels.push("original contribution");
+
+        return labels;
+    };
+
+    const getLocalSourceContext = (source) => {
+        const body = String(source.body || "").trim().slice(0, 4500);
+        const userNote = stripHtml(source.userNote || "").slice(0, 3500);
+        const contextParts = [];
+
+        if (body) {
+            contextParts.push(`SOURCE NOTE / SUMMARY:\n${body}`);
+        }
+
+        if (userNote) {
+            contextParts.push(`USER ANNOTATIONS:\n${userNote}`);
+        }
+
+        return contextParts.join("\n\n");
+    };
+
     /***************************************************************************/
     const convertDatabaseLinkToCanvasLink = (link) => {
         return {
@@ -791,89 +957,486 @@ function CanvasBoard(){
         }
     };
     /***************************************************************************/
-    const loadNotesFromDatabase = async () => {
-        try {
-            const data = await apiRequest("/notes");
-
-            const databaseNotes = data.notes.map(convertDatabaseNoteToCanvasNote);
-
-            setNotes(databaseNotes);
-
-            const cabinetFiles = databaseNotes
-                .filter((note) => note.fileUrl || note.sourceName)
-                .map(convertNoteToCabinetFile);
-
-            setFiles(cabinetFiles);
-        } catch (error) {
-            console.error("Load notes error:", error);
-        }
-    };
-    /***************************************************************************/
-    const handleGenerateFramework = async () => {
-        if (selectedNotes.length === 0) {
-            alert("Please select at least one note to generate a framework.");
-            return;
-        }
-
-        setFrameworkStep("generating");
-
-        setTimeout(() => {
-            const mockFramework = {
-                id: Date.now(),
-                title: "Framework V1",
-                status: "Saved",
-                sourceCount: selectedNotes.length,
-                detailLevel: frameworkDetailLevel,
-                sources: selectedFrameworkSources,
-                content: `
-    RESEARCH QUESTION
-    How do the selected sources help construct a research argument?
-
-    WORKING ARGUMENT
-    The selected materials suggest that visual evidence is not neutral. It is shaped by archives, interpretation, absence, and the way sources are connected.
-
-    FRAMEWORK SECTIONS
-
-    01 Key Concepts and Theory
-    - Identify the major concepts in the selected notes.
-    - Explain how these concepts define the research direction.
-
-    02 Claims and Evidence
-    - Extract the strongest claims from the selected sources.
-    - Link each claim to supporting evidence.
-
-    03 Source Relationships
-    - Explain how the selected notes support, extend, challenge, or complicate one another.
-
-    04 Research Gaps
-    - Identify missing evidence, unclear assumptions, or areas requiring further investigation.
-
-    05 Original Contribution
-    - Suggest what new argument or interpretation could emerge from these materials.
-                `.trim(),
-            };
-
-            setCurrentFramework(mockFramework);
-            setFrameworkEditorDraft(mockFramework.content);
-            setFrameworkStep("output");
-        }, 1200);
-    };
-
-
     const selectedNotes = notes.filter((note) => note.selected);
 
     const selectedFrameworkSources = selectedNotes.map((note) => ({
         id: note.id,
         title: note.title,
         body: note.body,
+        userNote: note.userNote || "",
         sourceName: note.sourceName || note.title,
+        noteKind: note.noteKind || note.sourceType || "pdf",
+        fileUrl: note.fileUrl || "",
+        chunksAdded: note.chunksAdded || null,
     }));
 
+    /***************************************************************************/
+    const loadNotesFromDatabase = async () => {
+        try {
+            const data = await apiRequest("/notes");
+
+            const allDatabaseNotes = data.notes.map(convertDatabaseNoteToCanvasNote);
+            const savedFrameworks = sortFrameworkVersions(
+                allDatabaseNotes
+                    .filter((note) => note.noteKind === "framework")
+                    .map(convertFrameworkNoteToFramework)
+            );
+            const canvasNotes = allDatabaseNotes.filter(
+                (note) => note.noteKind !== "framework"
+            );
+
+            setNotes(canvasNotes);
+            setFrameworkVersions(savedFrameworks);
+
+            const cabinetFiles = canvasNotes
+                .filter(
+                    (note) =>
+                        note.noteKind !== "outline" &&
+                        note.noteKind !== "framework" &&
+                        (note.fileUrl || note.sourceName)
+                )
+                .map(convertNoteToCabinetFile);
+
+            setFiles(cabinetFiles);
+
+            if (savedFrameworks.length > 0) {
+                const latestFramework = savedFrameworks[0];
+                setCurrentFramework(latestFramework);
+                setFrameworkEditorDraft(latestFramework.content);
+                setFrameworkDirection(latestFramework.direction || "");
+                setFrameworkArgument(latestFramework.argument || "");
+                setFrameworkDetailLevel(latestFramework.detailLevel || "detailed");
+                setFrameworkOptions((prev) => ({
+                    ...prev,
+                    ...(latestFramework.options || {}),
+                }));
+                frameworkLastSavedContentRef.current = latestFramework.content;
+                setFrameworkSaveStatus("saved");
+            }
+        } catch (error) {
+            console.error("Load notes error:", error);
+        }
+    };
+
+    const persistCurrentFrameworkImmediately = async () => {
+        if (!currentFramework) {
+            return true;
+        }
+
+        if (!currentFramework.id) {
+            setFrameworkSaveStatus("error");
+            setFrameworkGenerationError(
+                "This framework is not saved yet, so it cannot be safely replaced."
+            );
+            return false;
+        }
+
+        if (frameworkEditorDraft === frameworkLastSavedContentRef.current) {
+            return true;
+        }
+
+        setFrameworkSaveStatus("saving");
+
+        const contentToSave = frameworkEditorDraft;
+        const updatedFrameworkNote = await updateNoteInDatabase(currentFramework.id, {
+            body: contentToSave,
+        });
+
+        if (!updatedFrameworkNote) {
+            setFrameworkSaveStatus("error");
+            setFrameworkGenerationError(
+                "The latest Framework edits could not be saved."
+            );
+            return false;
+        }
+
+        frameworkLastSavedContentRef.current = contentToSave;
+        frameworkLatestDraftRef.current = contentToSave;
+
+        setCurrentFramework((prevFramework) =>
+            prevFramework
+                ? {
+                      ...prevFramework,
+                      content: contentToSave,
+                      updatedAt: updatedFrameworkNote.updatedAt,
+                  }
+                : prevFramework
+        );
+
+        setFrameworkVersions((prevFrameworks) =>
+            prevFrameworks.map((framework) =>
+                framework.id === currentFramework.id
+                    ? {
+                          ...framework,
+                          content: contentToSave,
+                          updatedAt: updatedFrameworkNote.updatedAt,
+                      }
+                    : framework
+            )
+        );
+
+        setFrameworkSaveStatus("saved");
+        return true;
+    };
+
+    const handleCreateNewFramework = async () => {
+        const canContinue = await persistCurrentFrameworkImmediately();
+
+        if (!canContinue) {
+            return;
+        }
+
+        setFrameworkStep("setup");
+        setFrameworkGenerationError("");
+        setFrameworkRefinementPrompt("");
+        setIsFrameworkExpanded(false);
+    };
+
+    const handleSelectFrameworkVersion = async (frameworkId) => {
+        const selectedFramework = frameworkVersions.find(
+            (framework) => String(framework.id) === String(frameworkId)
+        );
+
+        if (!selectedFramework || selectedFramework.id === currentFramework?.id) {
+            return;
+        }
+
+        const canContinue = await persistCurrentFrameworkImmediately();
+
+        if (!canContinue) {
+            return;
+        }
+
+        setCurrentFramework(selectedFramework);
+        setFrameworkEditorDraft(selectedFramework.content);
+        setFrameworkDirection(selectedFramework.direction || "");
+        setFrameworkArgument(selectedFramework.argument || "");
+        setFrameworkDetailLevel(selectedFramework.detailLevel || "detailed");
+        setFrameworkOptions((prev) => ({
+            ...prev,
+            ...(selectedFramework.options || {}),
+        }));
+        frameworkLastSavedContentRef.current = selectedFramework.content;
+        frameworkLatestDraftRef.current = selectedFramework.content;
+        setFrameworkSaveStatus("saved");
+        setFrameworkGenerationError("");
+        setFrameworkStep("output");
+    };
+
+    const handleCancelFrameworkGeneration = () => {
+        frameworkGenerationAbortRef.current?.abort();
+        frameworkGenerationAbortRef.current = null;
+        setFrameworkStep("setup");
+    };
+
+    const handleGenerateFramework = async () => {
+        if (selectedNotes.length === 0) {
+            alert("Select at least one note.");
+            return;
+        }
+    
+        setFrameworkStep("generating");
+    
+        try {
+            const combinedText = selectedNotes
+                .map((n) => `SOURCE: ${n.title}\n${n.body}`)
+                .join("\n\n");
+    
+            const frameworkText = `
+    RESEARCH QUESTION
+    ${frameworkDirection || "What relationships exist across the selected sources?"}
+    
+    WORKING ARGUMENT
+    ${frameworkArgument || "The selected materials suggest a pattern of interpretation shaped by source context."}
+    
+    FRAMEWORK
+    
+    1. Key Concepts
+    - Extracted from selected sources
+    
+    2. Claims & Evidence
+    ${combinedText.slice(0, 2000)}
+    
+    3. Source Relationships
+    - These sources interact through shared themes
+    
+    4. Research Gaps
+    - Missing connections between sources
+    
+    5. Contribution
+    - A synthesized interpretation
+            `.trim();
+    
+            const data = await apiRequest("/notes", {
+                method: "POST",
+                body: JSON.stringify({
+                    title: "Framework",
+                    body: frameworkText,
+                }),
+            });
+    
+            setCurrentFramework({
+                id: data.note.id,
+                content: frameworkText,
+            });
+    
+            setFrameworkEditorDraft(frameworkText);
+            setFrameworkStep("output");
+    
+        } catch (err) {
+            console.error(err);
+            alert("Failed.");
+            setFrameworkStep("setup");
+        }
+    };
+
+    const handleRefineFramework = async () => {
+        const instruction = frameworkRefinementPrompt.trim();
+
+        if (!instruction || !currentFramework || !frameworkEditorDraft.trim()) {
+            return;
+        }
+
+        setIsFrameworkRefining(true);
+        setFrameworkGenerationError("");
+
+        try {
+            const sourceList = (currentFramework.sources || [])
+                .map((source) => `- ${source.title}`)
+                .join("\n");
+            const refinementPrompt = `
+Revise the academic research framework below according to the user's instruction.
+Return the entire revised framework in clean Markdown, not just the changed paragraph.
+Do not add a conversational preface or code fences.
+Preserve accurate source references and do not invent evidence.
+If the requested change needs evidence that is not present, mark it NEEDS EVIDENCE.
+
+USER INSTRUCTION
+${instruction}
+
+LINKED SOURCES
+${sourceList || "No linked-source list is available."}
+
+CURRENT FRAMEWORK
+${frameworkEditorDraft.slice(0, 60000)}
+            `.trim();
+
+            const data = await requestAiText({
+                question: refinementPrompt,
+                useRag: false,
+            });
+            const revisedFramework = data.answer;
+
+            setFrameworkEditorDraft(revisedFramework);
+            setFrameworkRefinementPrompt("");
+            setFrameworkSaveStatus(currentFramework.id ? "editing" : "error");
+        } catch (error) {
+            console.error("Refine framework error:", error);
+            setFrameworkGenerationError(
+                error.message || "Failed to refine the framework."
+            );
+        } finally {
+            setIsFrameworkRefining(false);
+        }
+    };
+
+    const handleConvertFrameworkToOutline = async () => {
+        const frameworkText =
+            frameworkEditorDraft.trim() ||
+            currentFramework?.content?.trim() ||
+            "";
+    
+        if (!frameworkText) {
+            alert("There is no Framework content to convert.");
+            return;
+        }
+
+        setIsConvertingOutline(true);
+    
+        const outlineTitle = `Outline - ${
+            currentFramework?.title || "Framework"
+        }`;
+    
+        const outlineText = `
+    OUTLINE
+    
+    I. INTRODUCTION
+    - Research topic: ${frameworkDirection || "Topic derived from the Framework"}
+    - Background and research context
+    - Research question
+    - Working thesis or argument
+    
+    II. KEY CONCEPTS AND THEORETICAL CONTEXT
+    - Define the main concepts
+    - Explain the relevant theoretical framework
+    - Establish the terms used in the research
+    
+    III. MAIN ARGUMENTS AND EVIDENCE
+    ${frameworkText}
+    
+    IV. SOURCE RELATIONSHIPS
+    - Explain how the selected sources support one another
+    - Identify agreements, tensions, and contradictions
+    - Connect evidence to each major claim
+    
+    V. RESEARCH GAPS
+    - Identify missing evidence
+    - Note unresolved questions
+    - List areas requiring further research
+    
+    VI. ORIGINAL CONTRIBUTION
+    - State the new interpretation or contribution
+    - Explain how the argument extends existing research
+    
+    VII. CONCLUSION
+    - Restate the central argument
+    - Summarize the strongest evidence
+    - Explain the significance of the research
+        `.trim();
+    
+        // The note editor stores editable content as HTML.
+        const escapeHtml = (value) =>
+            value
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+    
+        const outlineHtml = escapeHtml(outlineText).replace(/\n/g, "<br>");
+    
+        // Put the new card in the currently visible part of the Canvas,
+        // instead of the hidden default position x=0, y=0.
+        const stagger = (notes.length % 5) * 24;
+    
+        const outlineX =
+            (380 - boardOffset.x) / boardScale + stagger;
+    
+        const outlineY =
+            (150 - boardOffset.y) / boardScale + stagger;
+    
+        try {
+            const data = await apiRequest("/notes", {
+                method: "POST",
+                body: JSON.stringify({
+                    title: outlineTitle,
+                    body: outlineText,
+                    user_note: outlineHtml,
+                    x: outlineX,
+                    y: outlineY,
+    
+                    // Keep an already-supported database value.
+                    source_type: "pdf",
+                    source_name: OUTLINE_STORAGE_SOURCE,
+                }),
+            });
+    
+            const newOutlineNote =
+                convertDatabaseNoteToCanvasNote(data.note);
+    
+            // Immediately show it on the Canvas.
+            setNotes((prevNotes) => [
+                ...prevNotes,
+                newOutlineNote,
+            ]);
+    
+            // Immediately show it in the Cabinet.
+            const newCabinetFile =
+                convertNoteToCabinetFile(newOutlineNote);
+    
+            setFiles((prevFiles) => [
+                newCabinetFile,
+                ...prevFiles,
+            ]);
+    
+            // Close the Framework interfaces.
+            setIsFrameworkExpanded(false);
+            setIsFrameworkPanelOpen(false);
+    
+            // Open the new Outline in the existing note editor.
+            handleOpenNote(newOutlineNote);
+    
+            alert("Outline created and opened.");
+        } catch (error) {
+            console.error("Convert to Outline error:", error);
+        
+            alert(
+                error.message ||
+                "Failed to create the Outline."
+            );
+        } finally {
+            setIsConvertingOutline(false);
+        }
+    };
 
     useEffect(() => {
         loadNotesFromDatabase();
         loadLinksFromDatabase();
+
+        return () => {
+            frameworkGenerationAbortRef.current?.abort();
+        };
     }, []);
+    /***************************************************************************/
+    useEffect(() => {
+        frameworkLatestDraftRef.current = frameworkEditorDraft;
+
+        if (
+            frameworkStep !== "output" ||
+            !currentFramework?.id ||
+            frameworkEditorDraft === frameworkLastSavedContentRef.current
+        ) {
+            return;
+        }
+
+        setFrameworkSaveStatus("editing");
+
+        const frameworkId = currentFramework.id;
+        const contentToSave = frameworkEditorDraft;
+
+        const saveTimer = window.setTimeout(async () => {
+            setFrameworkSaveStatus("saving");
+
+            const updatedFrameworkNote = await updateNoteInDatabase(frameworkId, {
+                body: contentToSave,
+            });
+
+            if (!updatedFrameworkNote) {
+                setFrameworkSaveStatus("error");
+                return;
+            }
+
+            frameworkLastSavedContentRef.current = contentToSave;
+
+            setCurrentFramework((prevFramework) =>
+                prevFramework?.id === frameworkId
+                    ? {
+                          ...prevFramework,
+                          content: contentToSave,
+                          updatedAt: updatedFrameworkNote.updatedAt,
+                      }
+                    : prevFramework
+            );
+
+            setFrameworkVersions((prevFrameworks) =>
+                prevFrameworks.map((framework) =>
+                    framework.id === frameworkId
+                        ? {
+                              ...framework,
+                              content: contentToSave,
+                              updatedAt: updatedFrameworkNote.updatedAt,
+                          }
+                        : framework
+                )
+            );
+
+            setFrameworkSaveStatus(
+                frameworkLatestDraftRef.current === contentToSave
+                    ? "saved"
+                    : "editing"
+            );
+        }, 900);
+
+        return () => window.clearTimeout(saveTimer);
+    }, [frameworkEditorDraft, currentFramework?.id, frameworkStep]);
     /***************************************************************************/
     useEffect(() => {
         if (openedNote && editorRef.current) {
@@ -1058,7 +1621,12 @@ function CanvasBoard(){
                 onCompare={handleCompare}
                 onFindEvidence={handleFindEvidence}
                 onFindGaps={handleFindGaps}
-                onFramework={() => {setIsFrameworkPanelOpen(true);setFrameworkStep("setup");setIsChatOpen(true);}}
+                onFramework={() => {
+                    setIsFrameworkPanelOpen(true);
+                    setFrameworkStep(currentFramework ? "output" : "setup");
+                    setFrameworkGenerationError("");
+                    setIsChatOpen(true);
+                }}
                 onOutline={handleOutline}
 
                 onSave={handleSaveProject}
@@ -1141,14 +1709,22 @@ function CanvasBoard(){
                             > 
                                 <p className="Canvas_Note_Title">{note.title}</p>
                                 <p className="Canvas_Note_Body">{note.body.length > 90 ? `${note.body.slice(0, 90)}...` : note.body}</p>
-                                <p className="Canvas_Note_Meta">PDF Source</p>
+                                <p className="Canvas_Note_Meta">
+                                    {note.noteKind === "outline"
+                                        ? "Generated Outline"
+                                        : note.noteKind === "pdf"
+                                          ? "PDF Source"
+                                          : "Note"}
+                                </p>
                                 <div className="Canvas_Note_Dot"></div>
                             </div>
                         ))}
 
                         {hoveredNote && (
                             <div className="Note_Preview_Card" style={{left: `${hoveredNote.x + NOTE_WIDTH + 8}px`, top: `${hoveredNote.y}px`}} onMouseEnter={() => setHoveredNoteId(hoveredNote.id)} onMouseLeave={() => setHoveredNoteId(null)}>
-                                <p className="Note_Preview_Label">PAPER</p>
+                                <p className="Note_Preview_Label">
+                                    {hoveredNote.noteKind === "outline" ? "OUTLINE" : "PAPER"}
+                                </p>
                                 <h3>{hoveredNote.title}</h3>
                                 <p className="Note_Preview_Label">ABSTRACT</p>
                                 <p className="Note_Preview_Text">{hoveredNote.body}</p>
@@ -1207,12 +1783,23 @@ function CanvasBoard(){
                                     frameworkOptions={frameworkOptions}
                                     setFrameworkOptions={setFrameworkOptions}
                                     currentFramework={currentFramework}
+                                    frameworkVersions={frameworkVersions}
                                     frameworkEditorDraft={frameworkEditorDraft}
                                     setFrameworkEditorDraft={setFrameworkEditorDraft}
+                                    frameworkSaveStatus={frameworkSaveStatus}
+                                    generationError={frameworkGenerationError}
+                                    refinementPrompt={frameworkRefinementPrompt}
+                                    setRefinementPrompt={setFrameworkRefinementPrompt}
+                                    isRefining={isFrameworkRefining}
+                                    isConvertingOutline={isConvertingOutline}
                                     onGenerate={handleGenerateFramework}
+                                    onCancelGeneration={handleCancelFrameworkGeneration}
+                                    onCreateNew={handleCreateNewFramework}
+                                    onSelectVersion={handleSelectFrameworkVersion}
+                                    onRefine={handleRefineFramework}
                                     onClose={() => setIsFrameworkPanelOpen(false)}
                                     onExpand={() => setIsFrameworkExpanded(true)}
-                                    onConvertToOutline={() => alert("Convert to Outline will be added next.")}
+                                    onConvertToOutline={handleConvertFrameworkToOutline}
                                 />
                             ) : (
                                 <>
@@ -1412,7 +1999,15 @@ function CanvasBoard(){
                             </div>
 
                             <div className="Framework_Expanded_Header_Actions">
-                                <span>SAVED</span>
+                                <span>
+                                    {frameworkSaveStatus === "saving"
+                                        ? "SAVING..."
+                                        : frameworkSaveStatus === "editing"
+                                          ? "EDITING"
+                                          : frameworkSaveStatus === "error"
+                                            ? "SAVE ERROR"
+                                            : "SAVED"}
+                                </span>
                                 <button type="button" onClick={() => setIsFrameworkExpanded(false)}>
                                     ×
                                 </button>
@@ -1421,15 +2016,15 @@ function CanvasBoard(){
 
                         <div className="Framework_Expanded_Body">
                             <aside className="Framework_Expanded_Nav">
-                                <p>DOCUMENT OUTLINE</p>
-                                <button>RQ Research direction</button>
-                                <button>01 Index & evidence</button>
-                                <button>02 Archive & power</button>
-                                <button>03 Research gap</button>
+                                <p>DOCUMENT</p>
+                                <button type="button">Research question</button>
+                                <button type="button">Working argument</button>
+                                <button type="button">Claims & evidence</button>
+                                <button type="button">Research gaps</button>
 
                                 <div className="Framework_Linked_Sources">
                                     <p>LINKED SOURCES</p>
-                                    {currentFramework.sources.map((source) => (
+                                    {(currentFramework.sources || []).map((source) => (
                                         <span key={source.id}>● {source.title}</span>
                                     ))}
                                 </div>
@@ -1437,29 +2032,72 @@ function CanvasBoard(){
 
                             <main className="Framework_Expanded_Editor">
                                 <div className="Framework_Expanded_Toolbar">
-                                    <button>Paragraph</button>
-                                    <button><b>B</b></button>
-                                    <button><i>I</i></button>
-                                    <button>Comment</button>
+                                    <button type="button">Paragraph</button>
+                                    <button type="button"><b>B</b></button>
+                                    <button type="button"><i>I</i></button>
+                                    <button type="button">Comment</button>
                                 </div>
 
                                 <textarea
                                     value={frameworkEditorDraft}
                                     onChange={(event) => setFrameworkEditorDraft(event.target.value)}
                                 />
+
+                                <div className="Framework_Expanded_Refine_Bar">
+                                    <input
+                                        type="text"
+                                        value={frameworkRefinementPrompt}
+                                        onChange={(event) =>
+                                            setFrameworkRefinementPrompt(event.target.value)
+                                        }
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" && !event.shiftKey) {
+                                                event.preventDefault();
+                                                handleRefineFramework();
+                                            }
+                                        }}
+                                        placeholder="Ask AI to revise a section, claim, gap, tone, or detail..."
+                                        disabled={isFrameworkRefining}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleRefineFramework}
+                                        disabled={
+                                            isFrameworkRefining ||
+                                            !frameworkRefinementPrompt.trim()
+                                        }
+                                    >
+                                        {isFrameworkRefining ? "Revising..." : "Apply with AI"}
+                                    </button>
+                                </div>
+
+                                {frameworkGenerationError && (
+                                    <p className="Framework_Expanded_Error">
+                                        {frameworkGenerationError}
+                                    </p>
+                                )}
                             </main>
                         </div>
 
                         <div className="Framework_Expanded_Footer">
-                            <span>{frameworkEditorDraft.length} characters · All changes saved</span>
+                            <span>
+                                {frameworkEditorDraft.length} characters · {frameworkSaveStatus}
+                            </span>
 
                             <div>
                                 <button type="button" onClick={() => setIsFrameworkExpanded(false)}>
                                     Done editing
                                 </button>
 
-                                <button type="button" className="Dark">
-                                    Convert to Outline
+                                <button
+                                    type="button"
+                                    className="Dark"
+                                    onClick={handleConvertFrameworkToOutline}
+                                    disabled={isConvertingOutline}
+                                >
+                                    {isConvertingOutline
+                                        ? "Converting..."
+                                        : "Convert to Outline"}
                                 </button>
                             </div>
                         </div>

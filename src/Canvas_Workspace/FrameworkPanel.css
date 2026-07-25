@@ -288,3 +288,128 @@
     padding: 10px 14px;
     cursor: pointer;
 }
+/* Backend-connected Framework states */
+.Framework_Error_Banner {
+    margin-bottom: 12px;
+    border: 1px solid #c86f6f;
+    background: #fff5f5;
+    color: #7c2525;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.Framework_Secondary_Button {
+    min-width: 110px;
+    height: 38px;
+    border: 1px solid #cfcfcf;
+    background: white;
+    color: #333;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.Framework_Secondary_Button:hover {
+    background: #f1f1f1;
+}
+
+.Framework_Output_Actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.Framework_Version_Row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: white;
+}
+
+.Framework_Version_Row span {
+    font-size: 11px;
+    color: #666;
+}
+
+.Framework_Version_Row select {
+    min-width: 130px;
+    border: 1px solid #d7d7d7;
+    border-radius: 7px;
+    background: white;
+    padding: 6px 8px;
+    font-size: 11px;
+    outline: none;
+}
+
+.Framework_Source_Summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.Framework_Source_Summary span {
+    max-width: 100%;
+    border-radius: 999px;
+    background: #ececec;
+    color: #555;
+    padding: 5px 8px;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.Framework_Refine_Box {
+    margin-top: 10px;
+    border: 1px solid #dddddd;
+    border-radius: 8px;
+    background: white;
+    padding: 10px;
+}
+
+.Framework_Refine_Box .Framework_Label {
+    margin-bottom: 7px;
+}
+
+.Framework_Refine_Row {
+    display: flex;
+    gap: 7px;
+}
+
+.Framework_Refine_Row input {
+    flex: 1;
+    min-width: 0;
+    height: 36px;
+    border: 1px solid #d5d5d5;
+    border-radius: 7px;
+    padding: 0 10px;
+    font-size: 11px;
+    outline: none;
+}
+
+.Framework_Refine_Row input:focus {
+    border-color: #555;
+}
+
+.Framework_Refine_Row button {
+    min-width: 72px;
+    border: none;
+    border-radius: 7px;
+    background: #444;
+    color: white;
+    padding: 0 10px;
+    cursor: pointer;
+}
+
+.Framework_Refine_Row button:disabled,
+.Framework_Output_Footer button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
