@@ -142,6 +142,9 @@ function CanvasBoard(){
 
     const [undoStack, setUndoStack] = useState([]);
     const [redoStack, setRedoStack] = useState([]);
+    const [isRestoringHistory, setIsRestoringHistory] = useState(false);
+
+    const dragStartSnapshot = useRef(null);
 
     const frameworkLastSavedContentRef = useRef("");
     const frameworkLatestDraftRef = useRef("");
@@ -175,32 +178,94 @@ function CanvasBoard(){
     //     setNotes(formattedNotes);
     // };
     const getSnapshot = () => ({
-        notes: notes.map(n => ({ id: n.id, x: n.x, y: n.y })),
-        boardOffset,
+        notes: notes.map(n => ({
+            ...n
+        })),
+        links: links.map(l => ({
+            ...l
+        })),
+        boardOffset: { ...boardOffset },
         boardScale,
     });
 
-    const applySnapshot = async (snapshot) => {
-        // 更新 UI
-        setNotes(prev =>
-            prev.map(note => {
-                const saved = snapshot.notes.find(n => n.id === note.id);
-                return saved ? { ...note, x: saved.x, y: saved.y } : note;
-            })
-        );
+    const restoreSnapshot = async (snapshot) => {
+        setIsRestoringHistory(true);
     
-        setBoardOffset(snapshot.boardOffset);
-        setBoardScale(snapshot.boardScale);
+        try {
+            const currentNotes = [...notes];
+            const currentLinks = [...links];
     
-        // 同步数据库（只更新位置）
-        await Promise.all(
-            snapshot.notes.map(n =>
-                updateNoteInDatabase(n.id, {
-                    x: n.x,
-                    y: n.y,
-                })
-            )
-        );
+            // ---------- 1. 删除当前 links ----------
+            await Promise.all(
+                currentLinks.map(link =>
+                    apiRequest(`/links/${link.id}`, {
+                        method: "DELETE"
+                    }).catch(() => {})
+                )
+            );
+    
+            // ---------- 2. 删除当前 notes ----------
+            await Promise.all(
+                currentNotes.map(note =>
+                    apiRequest(`/notes/${note.id}`, {
+                        method: "DELETE"
+                    }).catch(() => {})
+                )
+            );
+    
+            // ---------- 3. 重建 notes ----------
+            const idMap = {};
+    
+            for (const note of snapshot.notes) {
+                const res = await apiRequest("/notes", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        title: note.title,
+                        body: note.body,
+                        user_note: note.userNote,
+                        x: note.x,
+                        y: note.y,
+                        source_type: note.sourceType,
+                        source_name: note.sourceName,
+                        file_url: note.fileUrl,
+                        file_size: note.fileSize,
+                        chunks_added: note.chunksAdded,
+                        db_total: note.dbTotal,
+                    }),
+                });
+    
+                idMap[note.id] = res.note.id;
+            }
+    
+            // ---------- 4. 重建 links ----------
+            for (const link of snapshot.links) {
+                const from = idMap[link.fromNoteId];
+                const to = idMap[link.toNoteId];
+    
+                if (from && to) {
+                    await apiRequest("/links", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            from_note_id: from,
+                            to_note_id: to,
+                        }),
+                    });
+                }
+            }
+    
+            // ---------- 5. reload ----------
+            await loadNotesFromDatabase();
+            await loadLinksFromDatabase();
+    
+            setBoardOffset(snapshot.boardOffset);
+            setBoardScale(snapshot.boardScale);
+    
+        } catch (err) {
+            console.error("Restore snapshot failed:", err);
+            alert("Undo/Redo failed.");
+        }
+    
+        setIsRestoringHistory(false);
     };
 
     /** When file upload success it will be package in the way we want so later can put into the PGSQL*/
@@ -528,8 +593,7 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const handleNoteMouseDown = (event, note) => {
-        setUndoStack(stack => [...stack, getSnapshot()]);
-        setRedoStack([]);
+        dragStartSnapshot.current = getSnapshot();
 
         event.stopPropagation();
 
@@ -573,16 +637,20 @@ function CanvasBoard(){
     /***************************************************************************/
     const handleCanvasMouseUp = async () => {
         if (draggingNoteId !== null && hasDraggedNote) {
-            const draggedNote = notes.find((note) => note.id === draggingNoteId);
-
+            const before = dragStartSnapshot.current;
+        
+            const draggedNote = notes.find(n => n.id === draggingNoteId);
+        
             if (draggedNote) {
                 await updateNoteInDatabase(draggedNote.id, {
                     x: draggedNote.x,
                     y: draggedNote.y,
                 });
+        
+                setUndoStack(s => [...s, before]);
+                setRedoStack([]);
             }
         }
-
 
         setDraggingNoteId(null);
         setIsPanningBoard(false);
@@ -649,6 +717,8 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const handleLinkSelectedNotes = async () => {
+        const before = getSnapshot();
+
         const selectedNotes = notes.filter((note) => note.selected);
 
         if (selectedNotes.length < 2) {
@@ -673,6 +743,8 @@ function CanvasBoard(){
 
         if (newLinks.length > 0) {
             setLinks((prevLinks) => [...prevLinks, ...newLinks]);
+            setUndoStack(s => [...s, before]);
+            setRedoStack([]);
         }
     };
     /***************************************************************************/
@@ -682,6 +754,8 @@ function CanvasBoard(){
     /***************************************************************************/
     /** This function deletes selected notes from both the board and Supabase */
     const handleDeleteSelectedNote = async () => {
+        const before = getSnapshot();
+
         const selectedNoteId = notes
             .filter((note) => note.selected)
             .map((note) => note.id);
@@ -713,6 +787,9 @@ function CanvasBoard(){
                     !successfullyDeletedIds.includes(link.toNoteId)
             )
         );
+
+        setUndoStack(s => [...s, before]);
+        setRedoStack([]);
     };
     /***************************************************************************/
     const linkAlreadyExists = (fromNoteId, toNoteId) => {
@@ -1575,25 +1652,25 @@ ${frameworkEditorDraft.slice(0, 60000)}
     }, [notes, links, openedNote]);
 
     const handleUndo = async () => {
-        if (undoStack.length === 0) return;
-
+        if (undoStack.length === 0 || isRestoringHistory) return;
+    
         const prev = undoStack[undoStack.length - 1];
-
-        setUndoStack(stack => stack.slice(0, -1));
-        setRedoStack(stack => [...stack, getSnapshot()]);
-
-        await applySnapshot(prev);
+    
+        setUndoStack(s => s.slice(0, -1));
+        setRedoStack(s => [...s, getSnapshot()]);
+    
+        await restoreSnapshot(prev);
     };
 
     const handleRedo = async () => {
-        if (redoStack.length === 0) return;
+        if (redoStack.length === 0 || isRestoringHistory) return;
     
         const next = redoStack[redoStack.length - 1];
     
-        setRedoStack(stack => stack.slice(0, -1));
-        setUndoStack(stack => [...stack, getSnapshot()]);
+        setRedoStack(s => s.slice(0, -1));
+        setUndoStack(s => [...s, getSnapshot()]);
     
-        await applySnapshot(next);
+        await restoreSnapshot(next);
     };
 
     const handleSelectTool = () => {
@@ -1613,6 +1690,8 @@ ${frameworkEditorDraft.slice(0, 60000)}
             y: 140 + notes.length * 25,
         };
 
+        const before = getSnapshot();
+
         try {
             const data = await apiRequest("/notes", {
                 method: "POST",
@@ -1621,6 +1700,8 @@ ${frameworkEditorDraft.slice(0, 60000)}
 
             const newCanvasNote = convertDatabaseNoteToCanvasNote(data.note);
             setNotes((prevNotes) => [...prevNotes, newCanvasNote]);
+            setUndoStack(s => [...s, before]);
+            setRedoStack([]);
         } catch (error) {
             console.error("Create blank note error:", error);
             alert("Failed to create note.");
@@ -1632,8 +1713,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
     };
 
     const handleAutoArrange = async () => {
-        setUndoStack(stack => [...stack, getSnapshot()]);
-        setRedoStack([]);
+        const before = getSnapshot();
     
         const updated = notes.map((note, index) => ({
             ...note,
@@ -1645,12 +1725,12 @@ ${frameworkEditorDraft.slice(0, 60000)}
     
         await Promise.all(
             updated.map(n =>
-                updateNoteInDatabase(n.id, {
-                    x: n.x,
-                    y: n.y,
-                })
+                updateNoteInDatabase(n.id, { x: n.x, y: n.y })
             )
         );
+    
+        setUndoStack(s => [...s, before]);
+        setRedoStack([]);
     };
 
     const handleLockSelected = () => {
