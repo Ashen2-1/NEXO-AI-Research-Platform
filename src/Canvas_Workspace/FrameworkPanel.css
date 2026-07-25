@@ -254,17 +254,47 @@
     font-size: 12px;
 }
 
-.Framework_Editor_Textarea {
+.Framework_Editor_Content {
     width: 100%;
-    min-height: 390px;
-    resize: vertical;
+    min-height: 300px;
+    max-height: 430px;
+
     border: 1px solid #222;
     border-radius: 8px;
     padding: 12px;
+    box-sizing: border-box;
+
     background: white;
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 1.6;
+    color: #222;
+
     outline: none;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    cursor: text;
+}
+
+.Framework_Editor_Content:empty::before {
+    content: attr(data-placeholder);
+    color: #999;
+    pointer-events: none;
+}
+
+.Framework_Editor_Content h1 {
+    margin: 8px 0;
+    font-size: 24px;
+}
+
+.Framework_Editor_Content h2 {
+    margin: 8px 0;
+    font-size: 19px;
+}
+
+.Framework_Editor_Content ul,
+.Framework_Editor_Content ol {
+    padding-left: 24px;
 }
 
 .Framework_Output_Footer {

@@ -1,5 +1,24 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import "./FrameworkPanel.css";
+
+const frameworkValueToHtml = (value) => {
+    const text = String(value || "");
+
+    const alreadyHtml =
+        /<\/?(p|div|br|strong|b|em|i|ul|ol|li|h[1-6]|blockquote|pre)\b/i.test(
+            text
+        );
+
+    if (alreadyHtml) {
+        return text;
+    }
+
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\n/g, "<br>");
+};
 
 function FrameworkPanel({
     step,
@@ -37,6 +56,38 @@ function FrameworkPanel({
     onExpand,
     onConvertToOutline,
 }) {
+    const frameworkEditorRef = useRef(null);
+
+    useEffect(() => {
+        const editor = frameworkEditorRef.current;
+
+        if (!editor) {
+            return;
+        }
+
+        const nextHtml = frameworkValueToHtml(frameworkEditorDraft);
+
+        if (editor.innerHTML !== nextHtml) {
+            editor.innerHTML = nextHtml;
+        }
+    }, [frameworkEditorDraft, currentFramework?.id]);
+
+    const handleFrameworkCommand = (event, command, value = null) => {
+        // 防止按钮抢走编辑区中的文字选区
+        event.preventDefault();
+
+        const editor = frameworkEditorRef.current;
+
+        if (!editor) {
+            return;
+        }
+
+        editor.focus();
+        document.execCommand(command, false, value);
+
+        setFrameworkEditorDraft(editor.innerHTML);
+    };
+
     const toggleOption = (key) => {
         setFrameworkOptions((prev) => ({
             ...prev,
@@ -271,17 +322,66 @@ function FrameworkPanel({
                         </div>
 
                         <div className="Framework_Mini_Toolbar">
-                            <button type="button">Paragraph</button>
-                            <button type="button"><b>B</b></button>
-                            <button type="button"><i>I</i></button>
-                            <button type="button">•</button>
-                            <button type="button">↶</button>
-                        </div>
+                            <button
+                                type="button"
+                                onMouseDown={(event) =>
+                                    handleFrameworkCommand(event, "formatBlock", "paragraph")
+                                }
+                            >
+                                Paragraph
+                            </button>
 
-                        <textarea
-                            className="Framework_Editor_Textarea"
-                            value={frameworkEditorDraft}
-                            onChange={(event) => setFrameworkEditorDraft(event.target.value)}
+                            <button
+                                type="button"
+                                onMouseDown={(event) =>
+                                    handleFrameworkCommand(event, "bold")
+                                }
+                            >
+                                <b>B</b>
+                            </button>
+
+                            <button
+                                type="button"
+                                onMouseDown={(event) =>
+                                    handleFrameworkCommand(event, "italic")
+                                }
+                            >
+                                <i>I</i>
+                            </button>
+
+                            <button
+                                type="button"
+                                onMouseDown={(event) =>
+                                    handleFrameworkCommand(
+                                        event,
+                                        "insertUnorderedList"
+                                    )
+                                }
+                            >
+                                •
+                            </button>
+
+                            <button
+                                type="button"
+                                onMouseDown={(event) =>
+                                    handleFrameworkCommand(event, "undo")
+                                }
+                            >
+                                ↶
+                            </button>
+                        </div>
+                        
+                        <div
+                            ref={frameworkEditorRef}
+                            className="Framework_Editor_Content"
+                            contentEditable
+                            suppressContentEditableWarning
+                            data-placeholder="Framework content will appear here..."
+                            onInput={(event) =>
+                                setFrameworkEditorDraft(
+                                    event.currentTarget.innerHTML
+                                )
+                            }
                         />
 
                         <div className="Framework_Refine_Box">

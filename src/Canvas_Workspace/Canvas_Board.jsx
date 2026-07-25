@@ -108,6 +108,7 @@ function CanvasBoard(){
     const [noteDraft, setNoteDraft] = useState("");
     const editorRef = useRef(null);
     const chatBottomRef = useRef(null);
+    const expandedFrameworkEditorRef = useRef(null);
 
     const [activeToolMode, setActiveToolMode] = useState("canvas");
 
@@ -718,6 +719,25 @@ function CanvasBoard(){
             setNoteDraft(editorRef.current.innerHTML);
         }
     };
+    /***************************************************************************/   
+    const handleExpandedFrameworkCommand = (
+        event,
+        command,
+        value = null
+    ) => {
+        event.preventDefault();
+    
+        const editor = expandedFrameworkEditorRef.current;
+    
+        if (!editor) {
+            return;
+        }
+    
+        editor.focus();
+        document.execCommand(command, false, value);
+    
+        setFrameworkEditorDraft(editor.innerHTML);
+    };
     /***************************************************************************/
     const convertDatabaseNoteToCanvasNote = (note) => {
         const sourceType = note.source_type || "pdf";
@@ -1242,9 +1262,8 @@ ${frameworkEditorDraft.slice(0, 60000)}
 
     const handleConvertFrameworkToOutline = async () => {
         const frameworkText =
-            frameworkEditorDraft.trim() ||
-            currentFramework?.content?.trim() ||
-            "";
+            stripHtml(frameworkEditorDraft).trim() ||
+            stripHtml(currentFramework?.content || "").trim();
     
         if (!frameworkText) {
             alert("There is no Framework content to convert.");
@@ -1366,7 +1385,34 @@ ${frameworkEditorDraft.slice(0, 60000)}
             setIsConvertingOutline(false);
         }
     };
-
+    /***************************************************************************/
+    useEffect(() => {
+        const editor = expandedFrameworkEditorRef.current;
+    
+        if (!isFrameworkExpanded || !editor) {
+            return;
+        }
+    
+        const nextHtml =
+            /<\/?(p|div|br|strong|b|em|i|ul|ol|li|h[1-6]|blockquote|pre)\b/i.test(
+                frameworkEditorDraft
+            )
+                ? frameworkEditorDraft
+                : String(frameworkEditorDraft || "")
+                      .replace(/&/g, "&amp;")
+                      .replace(/</g, "&lt;")
+                      .replace(/>/g, "&gt;")
+                      .replace(/\n/g, "<br>");
+    
+        if (editor.innerHTML !== nextHtml) {
+            editor.innerHTML = nextHtml;
+        }
+    }, [
+        isFrameworkExpanded,
+        frameworkEditorDraft,
+        currentFramework?.id,
+    ]);
+    /***************************************************************************/
     useEffect(() => {
         loadNotesFromDatabase();
         loadLinksFromDatabase();
@@ -2031,17 +2077,59 @@ ${frameworkEditorDraft.slice(0, 60000)}
                             </aside>
 
                             <main className="Framework_Expanded_Editor">
-                                <div className="Framework_Expanded_Toolbar">
-                                    <button type="button">Paragraph</button>
-                                    <button type="button"><b>B</b></button>
-                                    <button type="button"><i>I</i></button>
-                                    <button type="button">Comment</button>
-                                </div>
+                            <div className="Framework_Expanded_Toolbar">
+                                <button
+                                    type="button"
+                                    onMouseDown={(event) =>
+                                        handleExpandedFrameworkCommand(
+                                            event,
+                                            "formatBlock",
+                                            "paragraph"
+                                        )
+                                    }
+                                >
+                                    Paragraph
+                                </button>
 
-                                <textarea
-                                    value={frameworkEditorDraft}
-                                    onChange={(event) => setFrameworkEditorDraft(event.target.value)}
-                                />
+                                <button
+                                    type="button"
+                                    onMouseDown={(event) =>
+                                        handleExpandedFrameworkCommand(
+                                            event,
+                                            "bold"
+                                        )
+                                    }
+                                >
+                                    <b>B</b>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onMouseDown={(event) =>
+                                        handleExpandedFrameworkCommand(
+                                            event,
+                                            "italic"
+                                        )
+                                    }
+                                >
+                                    <i>I</i>
+                                </button>
+
+                                <button type="button">Comment</button>
+                            </div>
+
+                            <div
+                                ref={expandedFrameworkEditorRef}
+                                className="Framework_Expanded_Content"
+                                contentEditable
+                                suppressContentEditableWarning
+                                data-placeholder="Framework content will appear here..."
+                                onInput={(event) =>
+                                    setFrameworkEditorDraft(
+                                        event.currentTarget.innerHTML
+                                    )
+                                }
+                            />
 
                                 <div className="Framework_Expanded_Refine_Bar">
                                     <input
