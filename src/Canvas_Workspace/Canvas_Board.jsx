@@ -1672,6 +1672,83 @@ function CanvasBoard(){
         }
     };
     /***************************************************************************/   
+    const handleNoteEditorHistory = (
+        event,
+        command
+    ) => {
+        event.preventDefault();
+    
+        if (
+            !editorRef.current ||
+            !openedNote ||
+            openedNote.locked
+        ) {
+            return;
+        }
+    
+        // Keep the history command inside the Note editor.
+        editorRef.current.focus();
+    
+        document.execCommand(
+            command,
+            false,
+            null
+        );
+    
+        // Wait until the browser finishes changing the DOM,
+        // then synchronize React state with the editor.
+        window.requestAnimationFrame(() => {
+            if (!editorRef.current) {
+                return;
+            }
+    
+            setNoteDraft(
+                editorRef.current.innerHTML
+            );
+        });
+    };
+    
+    const handleNoteEditorKeyDown = (event) => {
+        const isModifierPressed =
+            event.metaKey || event.ctrlKey;
+    
+        if (!isModifierPressed) {
+            return;
+        }
+    
+        const key = event.key.toLowerCase();
+    
+        // Mac: Command + Z
+        // Windows: Ctrl + Z
+        if (key === "z" && !event.shiftKey) {
+            handleNoteEditorHistory(
+                event,
+                "undo"
+            );
+    
+            return;
+        }
+    
+        // Mac: Command + Shift + Z
+        // Windows: Ctrl + Shift + Z
+        if (key === "z" && event.shiftKey) {
+            handleNoteEditorHistory(
+                event,
+                "redo"
+            );
+    
+            return;
+        }
+    
+        // Windows alternative: Ctrl + Y
+        if (key === "y") {
+            handleNoteEditorHistory(
+                event,
+                "redo"
+            );
+        }
+    };
+    /***************************************************************************/   
     const handleExpandedFrameworkCommand = (
         event,
         command,
@@ -3701,8 +3778,33 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     </div>
 
                                     <div className="Note_Editor_Toolbar">
-                                        <button type="button"><TiArrowBack /></button>
-                                        <button type="button"><TiArrowForward /></button>
+                                        <button
+                                            type="button"
+                                            aria-label="Undo note edit"
+                                            title="Undo (Command/Ctrl + Z)"
+                                            onMouseDown={(event) =>
+                                                handleNoteEditorHistory(
+                                                    event,
+                                                    "undo"
+                                                )
+                                            }
+                                        >
+                                            <TiArrowBack />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            aria-label="Redo note edit"
+                                            title="Redo (Command/Ctrl + Shift + Z)"
+                                            onMouseDown={(event) =>
+                                                handleNoteEditorHistory(
+                                                    event,
+                                                    "redo"
+                                                )
+                                            }
+                                        >
+                                            <TiArrowForward />
+                                        </button>
 
                                         <select onChange={(event) => handleEditorCommand("formatBlock", event.target.value)} defaultValue="p">
                                             <option value="p">Normal</option>
@@ -3720,7 +3822,19 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                         <button type="button" onClick={() => handleEditorCommand("formatBlock", "blockquote")}>❝</button>
                                         <button type="button">—</button>
                                     </div>
-                                    <div ref={editorRef} className="Note_Editor_Content" contentEditable suppressContentEditableWarning suppressHydrationWarning onInput={(event) => setNoteDraft(event.currentTarget.innerHTML)}/>
+                                    <div
+                                        ref={editorRef}
+                                        className="Note_Editor_Content"
+                                        contentEditable={!openedNote.locked}
+                                        suppressContentEditableWarning
+                                        suppressHydrationWarning
+                                        onInput={(event) => {
+                                            setNoteDraft(
+                                                event.currentTarget.innerHTML
+                                            );
+                                        }}
+                                        onKeyDown={handleNoteEditorKeyDown}
+                                    />
                                 </div>
                             </div>
 
