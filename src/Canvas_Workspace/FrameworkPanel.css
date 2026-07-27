@@ -443,3 +443,27 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+@media (max-width: 700px) {
+    .Framework_Option_Grid {
+        grid-template-columns: 1fr;
+    }
+
+    .Framework_Output_Top {
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .Framework_Output_Actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .Framework_Refine_Row {
+        flex-direction: column;
+    }
+
+    .Framework_Refine_Row button {
+        height: 36px;
+    }
+}

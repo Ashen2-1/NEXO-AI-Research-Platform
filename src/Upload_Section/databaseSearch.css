@@ -430,3 +430,288 @@
     color: white;
     transform: scale(1.04);
 }
+
+
+/* =========================================================
+   Responsive Database Search
+   ========================================================= */
+
+   .database-overlay {
+    padding: clamp(10px, 2vw, 24px);
+}
+
+.database-modal {
+    width: min(1200px, 96vw);
+    height: min(900px, 92dvh);
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.database-content {
+    display: grid;
+    grid-template-columns:
+        clamp(210px, 20vw, 260px)
+        clamp(330px, 32vw, 430px)
+        minmax(0, 1fr);
+}
+
+.database-filter-panel,
+.database-results-panel {
+    width: auto;
+    min-width: 0;
+}
+
+.database-preview-panel {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.database-topbar-right {
+    min-width: 0;
+}
+
+.database-searchbar {
+    max-width: 100%;
+}
+
+.database-result-card {
+    overflow-wrap: anywhere;
+}
+
+.database-result-card h2,
+.preview-header h2 {
+    overflow-wrap: anywhere;
+}
+
+
+/* Medium laptops */
+@media (max-width: 1050px) {
+    .database-modal {
+        width: 98vw;
+        height: 95dvh;
+    }
+
+    .database-topbar {
+        padding: 0 20px;
+    }
+
+    /*
+      Filters become a horizontal section on top.
+      Results and preview remain side-by-side.
+    */
+    .database-content {
+        grid-template-columns:
+            minmax(320px, 43%)
+            minmax(0, 1fr);
+
+        grid-template-rows:
+            auto
+            minmax(0, 1fr);
+    }
+
+    .database-filter-panel {
+        grid-column: 1 / -1;
+
+        width: 100%;
+        max-height: 210px;
+
+        border-right: none;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+
+        padding: 16px 18px;
+
+        display: grid;
+        grid-template-columns: repeat(3, minmax(150px, 1fr));
+        gap: 14px 18px;
+
+        overflow-y: auto;
+    }
+
+    .database-filter-panel h3 {
+        grid-column: 1 / -1;
+        margin: 0;
+    }
+
+    .database-filter-section {
+        margin-bottom: 0;
+        min-width: 0;
+    }
+
+    .database-results-panel {
+        width: 100%;
+    }
+
+    .database-result-card {
+        padding: 22px 24px;
+    }
+
+    .database-result-card h2 {
+        font-size: 20px;
+    }
+}
+
+
+/* Small laptops and tablets */
+@media (max-width: 720px) {
+    .database-overlay {
+        padding: 0;
+    }
+
+    .database-modal {
+        width: 100vw;
+        height: 100dvh;
+        max-width: none;
+        max-height: none;
+
+        border-radius: 0;
+        border: none;
+    }
+
+    .database-topbar {
+        height: auto;
+        min-height: 130px;
+
+        padding: 14px;
+
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        gap: 14px;
+    }
+
+    .database-tabs {
+        width: 100%;
+        gap: 18px;
+
+        overflow-x: auto;
+        overflow-y: hidden;
+
+        white-space: nowrap;
+        padding-bottom: 4px;
+    }
+
+    .database-tabs::-webkit-scrollbar {
+        height: 3px;
+    }
+
+    .database-tabs::-webkit-scrollbar-thumb {
+        background: #cccccc;
+        border-radius: 999px;
+    }
+
+    .database-topbar-right {
+        width: 100%;
+        gap: 8px;
+    }
+
+    .database-searchbar {
+        width: auto;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .database-close-btn {
+        flex: 0 0 38px;
+    }
+
+    .database-content {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .database-filter-panel {
+        width: 100%;
+        max-height: 190px;
+        flex: 0 0 auto;
+
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+
+        padding: 14px;
+
+        border-right: none;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+
+        overflow-y: auto;
+    }
+
+    .database-filter-panel h3 {
+        grid-column: 1 / -1;
+    }
+
+    .year-inputs {
+        width: 100%;
+    }
+
+    .year-inputs input {
+        width: auto;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .database-results-panel {
+        width: 100%;
+        flex: 1;
+        min-height: 0;
+
+        border-right: none;
+    }
+
+    /*
+      Preview is hidden on narrow screens so that search results
+      remain readable. "Open source" still works.
+    */
+    .database-preview-panel {
+        display: none;
+    }
+
+    .database-results-header {
+        height: 48px;
+        padding: 0 14px;
+    }
+
+    .database-result-card {
+        padding: 18px 16px;
+    }
+
+    .database-result-card h2 {
+        font-size: 18px;
+    }
+
+    .database-description {
+        line-height: 1.55;
+    }
+
+    .database-actions {
+        flex-wrap: wrap;
+        row-gap: 10px;
+    }
+}
+
+
+/* Phones */
+@media (max-width: 460px) {
+    .database-filter-panel {
+        grid-template-columns: 1fr;
+        max-height: 170px;
+    }
+
+    .database-filter-panel h3 {
+        grid-column: 1;
+    }
+
+    .database-tab {
+        font-size: 10px;
+    }
+
+    .database-result-card h2 {
+        font-size: 17px;
+    }
+
+    .database-meta {
+        line-height: 1.5;
+    }
+}
