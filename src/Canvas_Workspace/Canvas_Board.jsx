@@ -89,6 +89,8 @@ function CanvasBoard(){
     const [notes, setNotes] = useState([]);
     const [links, setLinks] = useState([]);
 
+    const [sourceSearchQuery, setSourceSearchQuery] = useState("");
+
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [showDatabaseSearch, setShowDatabaseSearch] = useState(false);
     const [chatInput, setChatInput] = useState("");
@@ -729,14 +731,71 @@ function CanvasBoard(){
     //     setNotes((prevNotes) => [...prevNotes, newNote]);
     // };
     /***************************************************************************/
-    /** This function will count the number of note been selected */
-    const selectedNotesCount = notes.filter((note) => note.selected).length;
-    /***************************************************************************/
+    const normalizeSourceSearchText = (value) => {
+        return String(value ?? "")
+            .replace(/<[^>]*>/g, " ")
+            .replace(/&nbsp;/gi, " ")
+            .replace(/&amp;/gi, "&")
+            .replace(/\s+/g, " ")
+            .toLocaleLowerCase()
+            .trim();
+    };
+    
+    const sourceSearchTerms = normalizeSourceSearchText(
+        sourceSearchQuery
+    )
+        .split(" ")
+        .filter(Boolean);
+    
+    /*
+      Search only filters the Canvas while Research Tools
+      is active. Switching back to Canvas Tools displays
+      every Note again without deleting the search text.
+    */
+    const isSourceSearchActive =
+        activeToolMode === "research" &&
+        sourceSearchTerms.length > 0;
+    
+    const visibleNotes = isSourceSearchActive
+        ? notes.filter((note) => {
+              const titleAndAbstract =
+                  normalizeSourceSearchText(
+                      `${note.title ?? ""} ${note.body ?? ""}`
+                  );
+    
+              return sourceSearchTerms.every((term) =>
+                  titleAndAbstract.includes(term)
+              );
+          })
+        : notes;
+    
+    /*
+      Only display a Link when both endpoint Notes are
+      visible in the current search results.
+    */
+    const visibleNoteIds = new Set(
+        visibleNotes.map((note) => String(note.id))
+    );
+    
+    const visibleLinks = links.filter(
+        (link) =>
+            visibleNoteIds.has(String(link.fromNoteId)) &&
+            visibleNoteIds.has(String(link.toNoteId))
+    );
+    
+    const selectedNotesCount = visibleNotes.filter(
+        (note) => note.selected
+    ).length;
+    
     const zoomPercentage = Math.round(boardScale * 100);
-    /***************************************************************************/
-    const hoveredNote = notes.find((note) => note.id === hoveredNoteId);
-    /***************************************************************************/
-    const openedNote = notes.find((note) => note.id === openedNoteId);
+    
+    const hoveredNote = visibleNotes.find(
+        (note) => note.id === hoveredNoteId
+    );
+    
+    const openedNote = notes.find(
+        (note) => note.id === openedNoteId
+    );
     /***************************************************************************/
     const handleSendMessage = async () => {
         if (!chatInput.trim()) {
@@ -1898,10 +1957,12 @@ function CanvasBoard(){
         }
     };
     /***************************************************************************/
-    const selectedNotes = notes.filter((note) => note.selected);
+    const selectedNotes = visibleNotes.filter(
+        (note) => note.selected
+    );
 
     const clusterGroups = Object.entries(
-        notes.reduce((groups, note) => {
+        visibleNotes.reduce((groups, note) => {
             if (!note.clusterId) {
                 return groups;
             }
@@ -3133,7 +3194,13 @@ ${frameworkEditorDraft.slice(0, 60000)}
     };
 
     const handleSearchSources = (keyword) => {
-        console.log("Search sources:", keyword);
+        setSourceSearchQuery(
+            String(keyword ?? "")
+        );
+    
+        // Prevent a preview belonging to a hidden Note
+        // from remaining on the Canvas.
+        setHoveredNoteId(null);
     };
 
     const handlePrepareAiToolPrompt = (promptText) => {
@@ -3203,6 +3270,8 @@ ${frameworkEditorDraft.slice(0, 60000)}
                 onAutoArrange={handleAutoArrange}
                 onLockSelected={handleLockSelected}
                 onPinTop={handlePinTop}
+
+                sourceSearchQuery={sourceSearchQuery}
 
                 onSearchSources={handleSearchSources}
                 onAskOnly={handleAskOnly}
@@ -3282,7 +3351,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                         ))}
                         
                         <svg className="Canvas_Link_Layer">
-                            {links.map((link) => {
+                            {visibleLinks.map((link) => {
                                 const fromNote = getNoteById(link.fromNoteId);
                                 const toNote = getNoteById(link.toNoteId);
 
@@ -3301,7 +3370,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                             })}
                         </svg>
 
-                        {notes.map((note) => (
+                        {visibleNotes.map((note) => (
                             <div
                                 className={[
                                     "Canvas_Note_Card",
@@ -3406,7 +3475,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                 <p className="Note_Preview_Label">CONNECTIONS</p>
                                 <p className="Note_Preview_Number">
                                     {
-                                        links.filter(
+                                        visibleLinks.filter(
                                             (link) => link.fromNoteId === hoveredNote.id || link.toNoteId === hoveredNote.id
                                         ).length
                                     }
@@ -3422,8 +3491,16 @@ ${frameworkEditorDraft.slice(0, 60000)}
                     
                     <div className="Canvas_Bottom_Toolbar">
                         <span className="Canvas_Toolbar_Selected_Text">{selectedNotesCount} notes selected</span>
+                        
+                        {isSourceSearchActive && (
+                            <span className="Canvas_Link_Count_Text">
+                                {visibleNotes.length} result
+                                {visibleNotes.length === 1 ? "" : "s"}
+                            </span>
+                        )}
+
                         <span className="Canvas_Zoom_Text">{zoomPercentage}%</span>
-                        <span className="Canvas_Link_Count_Text">{links.length} links</span>
+                        <span className="Canvas_Link_Count_Text">{visibleLinks.length} links</span>
                         <button className="Canvas_Toolbar_Button" onClick={handleResetView}><FaHome /></button>
                         <button className="Canvas_Toolbar_Button" onClick={handleLinkSelectedNotes}><FaLink /></button>
                         <button className="Canvas_Toolbar_Button"><TfiAlignJustify /></button>
