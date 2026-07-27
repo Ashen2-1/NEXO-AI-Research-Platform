@@ -4,17 +4,38 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get("/", authMiddleware, async (req,res) => {
+router.get("/", authMiddleware, async (req, res) => {
     try {
         const result = await pool.query(
-            `select id, title, body, user_note, x, y, source_type, source_name, file_url, file_size, chunks_added, db_total, created_at, updated_at from public.notes where user_id = $1 order by created_at asc`, [req.user.id]
+            `select
+                id,
+                title,
+                body,
+                user_note,
+                x,
+                y,
+                source_type,
+                source_name,
+                file_url,
+                file_size,
+                chunks_added,
+                db_total,
+                is_locked,
+                is_pinned,
+                created_at,
+                updated_at
+             from public.notes
+             where user_id = $1
+             order by created_at asc`,
+            [req.user.id]
         );
 
         res.json({
             notes: result.rows,
         });
-    }catch (error) {
+    } catch (error) {
         console.error("Get notes error:", error);
+
         res.status(500).json({
             error: "Server error while getting notes.",
         });
@@ -39,6 +60,7 @@ router.post("/", authMiddleware, async (req, res) => {
             returning
                 id, title, body, user_note, x, y,
                 source_type, source_name, file_url, file_size, chunks_added, db_total,
+                is_locked, is_pinned,
                 created_at, updated_at`,
             [
                 req.user.id,
@@ -70,7 +92,16 @@ router.post("/", authMiddleware, async (req, res) => {
 
 router.patch("/:id", authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { title, body, user_note, x, y } = req.body;
+
+    const {
+        title,
+        body,
+        user_note,
+        x,
+        y,
+        is_locked,
+        is_pinned,
+    } = req.body;
 
     try {
         const result = await pool.query(
@@ -81,18 +112,35 @@ router.patch("/:id", authMiddleware, async (req, res) => {
                 user_note = coalesce($3, user_note),
                 x = coalesce($4, x),
                 y = coalesce($5, y),
+                is_locked = coalesce($6, is_locked),
+                is_pinned = coalesce($7, is_pinned),
                 updated_at = now()
-             where id = $6 and user_id = $7
+             where id = $8 and user_id = $9
              returning
-            id, title, body, user_note, x, y,
-            source_type, source_name, file_url, file_size, chunks_added, db_total,
-            created_at, updated_at`,
+                id,
+                title,
+                body,
+                user_note,
+                x,
+                y,
+                source_type,
+                source_name,
+                file_url,
+                file_size,
+                chunks_added,
+                db_total,
+                is_locked,
+                is_pinned,
+                created_at,
+                updated_at`,
             [
                 title ?? null,
                 body ?? null,
                 user_note ?? null,
                 x ?? null,
                 y ?? null,
+                is_locked ?? null,
+                is_pinned ?? null,
                 id,
                 req.user.id,
             ]
@@ -110,6 +158,7 @@ router.patch("/:id", authMiddleware, async (req, res) => {
         });
     } catch (error) {
         console.error("Update note error:", error);
+
         res.status(500).json({
             error: "Server error while updating note.",
         });

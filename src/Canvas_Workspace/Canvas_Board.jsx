@@ -593,18 +593,35 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const handleNoteMouseDown = (event, note) => {
-        dragStartSnapshot.current = getSnapshot();
-
         event.stopPropagation();
-
-        const canvasRect = event.currentTarget.closest(".Canvas_Center").getBoundingClientRect();
-
-        setDraggingNoteId(note.id);
         setHasDraggedNote(false);
-
+    
+        if (note.locked) {
+            return;
+        }
+    
+        dragStartSnapshot.current = getSnapshot();
+    
+        const canvasRect = event.currentTarget
+            .closest(".Canvas_Center")
+            .getBoundingClientRect();
+    
+        setDraggingNoteId(note.id);
+    
         setDragOffset({
-            x: (event.clientX - canvasRect.left - boardOffset.x) / boardScale - note.x,
-            y: (event.clientY - canvasRect.top - boardOffset.y) / boardScale - note.y,
+            x:
+                (event.clientX -
+                    canvasRect.left -
+                    boardOffset.x) /
+                    boardScale -
+                note.x,
+    
+            y:
+                (event.clientY -
+                    canvasRect.top -
+                    boardOffset.y) /
+                    boardScale -
+                note.y,
         });
     };
     /***************************************************************************/
@@ -754,42 +771,86 @@ function CanvasBoard(){
     /***************************************************************************/
     /** This function deletes selected notes from both the board and Supabase */
     const handleDeleteSelectedNote = async () => {
-        const before = getSnapshot();
-
-        const selectedNoteId = notes
-            .filter((note) => note.selected)
-            .map((note) => note.id);
-
-        if (selectedNoteId.length === 0) {
+        const selectedNotesToDelete = notes.filter(
+            (note) => note.selected
+        );
+    
+        if (selectedNotesToDelete.length === 0) {
             return;
         }
-
+    
+        const unlockedNotes = selectedNotesToDelete.filter(
+            (note) => !note.locked
+        );
+    
+        const lockedCount =
+            selectedNotesToDelete.length - unlockedNotes.length;
+    
+        if (unlockedNotes.length === 0) {
+            alert("Locked notes cannot be deleted.");
+            return;
+        }
+    
+        const before = getSnapshot();
+    
+        const unlockedNoteIds = unlockedNotes.map(
+            (note) => note.id
+        );
+    
         const deleteResults = await Promise.all(
-            selectedNoteId.map((noteId) => deleteNoteFromDatabase(noteId))
+            unlockedNoteIds.map((noteId) =>
+                deleteNoteFromDatabase(noteId)
+            )
         );
-
-        const successfullyDeletedIds = selectedNoteId.filter(
-            (noteId, index) => deleteResults[index]
-        );
-
+    
+        const successfullyDeletedIds =
+            unlockedNoteIds.filter(
+                (noteId, index) => deleteResults[index]
+            );
+    
+        if (successfullyDeletedIds.length === 0) {
+            alert("Failed to delete the selected notes.");
+            return;
+        }
+    
         setNotes((prevNotes) =>
-            prevNotes.filter((note) => !successfullyDeletedIds.includes(note.id))
+            prevNotes.filter(
+                (note) =>
+                    !successfullyDeletedIds.includes(note.id)
+            )
         );
-
+    
         setFiles((prevFiles) =>
-            prevFiles.filter((file) => !successfullyDeletedIds.includes(file.noteId))
+            prevFiles.filter(
+                (file) =>
+                    !successfullyDeletedIds.includes(
+                        file.noteId
+                    )
+            )
         );
-
+    
         setLinks((prevLinks) =>
             prevLinks.filter(
                 (link) =>
-                    !successfullyDeletedIds.includes(link.fromNoteId) &&
-                    !successfullyDeletedIds.includes(link.toNoteId)
+                    !successfullyDeletedIds.includes(
+                        link.fromNoteId
+                    ) &&
+                    !successfullyDeletedIds.includes(
+                        link.toNoteId
+                    )
             )
         );
-
-        setUndoStack(s => [...s, before]);
+    
+        setUndoStack((stack) => [...stack, before]);
         setRedoStack([]);
+    
+        if (lockedCount > 0) {
+            alert(
+                `${lockedCount} locked note${
+                    lockedCount === 1 ? "" : "s"
+                } were not deleted.`
+            );
+        }
     };
     /***************************************************************************/
     const linkAlreadyExists = (fromNoteId, toNoteId) => {
@@ -801,6 +862,11 @@ function CanvasBoard(){
     }
     /***************************************************************************/
     const handleOpenNote = (note) => {
+        if (note.locked) {
+            alert("This note is locked. Unlock it before editing.");
+            return;
+        }
+    
         setOpenedNoteId(note.id);
         setNoteDraft(note.userNote || "");
     };
@@ -811,33 +877,55 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const handleSaveNote = async () => {
-        const editorHtml = editorRef.current ? editorRef.current.innerHTML : "";
-
-        const updatedNote = await updateNoteInDatabase(openedNoteId, {
-            user_note: editorHtml,
-        });
-
+        if (!openedNote || openedNote.locked) {
+            alert("This note is locked and cannot be edited.");
+            return;
+        }
+    
+        const editorHtml = editorRef.current
+            ? editorRef.current.innerHTML
+            : "";
+    
+        const updatedNote = await updateNoteInDatabase(
+            openedNoteId,
+            {
+                user_note: editorHtml,
+            }
+        );
+    
         if (!updatedNote) {
             return;
         }
-
-        setNotes((prevNotes) => 
+    
+        setNotes((prevNotes) =>
             prevNotes.map((note) =>
-                note.id === openedNoteId ? {...note, userNote: editorHtml} : note
+                note.id === openedNoteId
+                    ? {
+                          ...note,
+                          userNote: editorHtml,
+                      }
+                    : note
             )
         );
-
+    
         setNoteDraft(editorHtml);
         handleCloseNote();
-    }
+    };
     /***************************************************************************/
-    const handleEditorCommand = (command, value = null) => {
+    const handleEditorCommand = (
+        command,
+        value = null
+    ) => {
+        if (!openedNote || openedNote.locked) {
+            return;
+        }
+    
         if (editorRef.current) {
             editorRef.current.focus();
         }
-
+    
         document.execCommand(command, false, value);
-
+    
         if (editorRef.current) {
             setNoteDraft(editorRef.current.innerHTML);
         }
@@ -883,6 +971,9 @@ function CanvasBoard(){
             x: Number(note.x),
             y: Number(note.y),
             selected: false,
+            
+            locked: Boolean(note.is_locked),
+            pinned: Boolean(note.is_pinned),
 
             sourceType,
             sourceName,
@@ -1713,32 +1804,158 @@ ${frameworkEditorDraft.slice(0, 60000)}
     };
 
     const handleAutoArrange = async () => {
-        const before = getSnapshot();
-    
-        const updated = notes.map((note, index) => ({
-            ...note,
-            x: 280 + (index % 4) * 220,
-            y: 120 + Math.floor(index / 4) * 190,
-        }));
-    
-        setNotes(updated);
-    
-        await Promise.all(
-            updated.map(n =>
-                updateNoteInDatabase(n.id, { x: n.x, y: n.y })
-            )
+        const movableNotes = notes.filter(
+            (note) => !note.locked
         );
     
-        setUndoStack(s => [...s, before]);
+        if (movableNotes.length === 0) {
+            alert("All notes are locked.");
+            return;
+        }
+    
+        const before = getSnapshot();
+    
+        const positionMap = new Map(
+            movableNotes.map((note, index) => [
+                note.id,
+                {
+                    x: 280 + (index % 4) * 220,
+                    y:
+                        120 +
+                        Math.floor(index / 4) * 190,
+                },
+            ])
+        );
+    
+        const updatedNotes = notes.map((note) => {
+            const nextPosition = positionMap.get(note.id);
+    
+            if (!nextPosition) {
+                return note;
+            }
+    
+            return {
+                ...note,
+                ...nextPosition,
+            };
+        });
+    
+        setNotes(updatedNotes);
+    
+        await Promise.all(
+            movableNotes.map((note) => {
+                const nextPosition =
+                    positionMap.get(note.id);
+    
+                return updateNoteInDatabase(
+                    note.id,
+                    nextPosition
+                );
+            })
+        );
+    
+        setUndoStack((stack) => [...stack, before]);
         setRedoStack([]);
     };
 
-    const handleLockSelected = () => {
-        alert("Lock selected will be added later.");
+    const handleLockSelected = async () => {
+        const selected = notes.filter(
+            (note) => note.selected
+        );
+    
+        if (selected.length === 0) {
+            alert("Select at least one note.");
+            return;
+        }
+    
+        const nextLockedState = !selected.every(
+            (note) => note.locked
+        );
+    
+        const updateResults = await Promise.all(
+            selected.map(async (note) => {
+                const updatedNote =
+                    await updateNoteInDatabase(note.id, {
+                        is_locked: nextLockedState,
+                    });
+    
+                return {
+                    noteId: note.id,
+                    success: Boolean(updatedNote),
+                };
+            })
+        );
+    
+        const successfulIds = new Set(
+            updateResults
+                .filter((result) => result.success)
+                .map((result) => result.noteId)
+        );
+    
+        setNotes((prevNotes) =>
+            prevNotes.map((note) =>
+                successfulIds.has(note.id)
+                    ? {
+                          ...note,
+                          locked: nextLockedState,
+                      }
+                    : note
+            )
+        );
+    
+        if (successfulIds.size !== selected.length) {
+            alert("Some notes could not be updated.");
+        }
     };
 
-    const handlePinTop = () => {
-        alert("Pin top will be added later.");
+    const handlePinTop = async () => {
+        const selected = notes.filter(
+            (note) => note.selected
+        );
+    
+        if (selected.length === 0) {
+            alert("Select at least one note.");
+            return;
+        }
+    
+        const nextPinnedState = !selected.every(
+            (note) => note.pinned
+        );
+    
+        const updateResults = await Promise.all(
+            selected.map(async (note) => {
+                const updatedNote =
+                    await updateNoteInDatabase(note.id, {
+                        is_pinned: nextPinnedState,
+                    });
+    
+                return {
+                    noteId: note.id,
+                    success: Boolean(updatedNote),
+                };
+            })
+        );
+    
+        const successfulIds = new Set(
+            updateResults
+                .filter((result) => result.success)
+                .map((result) => result.noteId)
+        );
+    
+        setNotes((prevNotes) =>
+            prevNotes.map((note) =>
+                successfulIds.has(note.id)
+                    ? {
+                          ...note,
+                          pinned: nextPinnedState,
+                      }
+                    : note
+            )
+        );
+    
+        if (successfulIds.size !== selected.length) {
+            alert("Some notes could not be updated.");
+        }
     };
 
     const handleSearchSources = (keyword) => {
@@ -1892,28 +2109,95 @@ ${frameworkEditorDraft.slice(0, 60000)}
                         </svg>
 
                         {notes.map((note) => (
-                        /** If the note is selected then we will add a new class ("Canvas_Note_Selected") to it, in this way we can change the color of the note to darker */
-                            <div className={`Canvas_Note_Card ${note.selected ? "Canvas_Note_Selected" : ""}`} 
-                                key={note.id} 
-                                onMouseEnter={() => setHoveredNoteId(note.id)}
-                                onMouseLeave={() => setHoveredNoteId(null)}  
+                            <div
+                                className={[
+                                    "Canvas_Note_Card",
+                                    note.selected
+                                        ? "Canvas_Note_Selected"
+                                        : "",
+                                ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                key={note.id}
+                                onMouseEnter={() =>
+                                    setHoveredNoteId(note.id)
+                                }
+                                onMouseLeave={() =>
+                                    setHoveredNoteId(null)
+                                }
                                 onClick={() => {
                                     if (!hasDraggedNote) {
                                         handleNoteClick(note.id);
                                     }
-                                }} 
-                                onMouseDown={(event) => handleNoteMouseDown(event,note)} 
-                                style={{left: `${note.x}px`, top: `${note.y}px`,}}
-                            > 
-                                <p className="Canvas_Note_Title">{note.title}</p>
-                                <p className="Canvas_Note_Body">{note.body.length > 90 ? `${note.body.slice(0, 90)}...` : note.body}</p>
+                                }}
+                                onMouseDown={(event) =>
+                                    handleNoteMouseDown(event, note)
+                                }
+                                style={{
+                                    left: `${note.x}px`,
+                                    top: `${note.y}px`,
+
+                                    // Pinned notes appear above normal notes.
+                                    zIndex: note.pinned ? 5 : 2,
+
+                                    // Locked notes cannot be dragged.
+                                    cursor: note.locked
+                                        ? "not-allowed"
+                                        : "grab",
+
+                                    // Simple visual indication for locked notes.
+                                    borderStyle: note.locked
+                                        ? "dashed"
+                                        : "solid",
+
+                                    // Simple visual indication for pinned notes.
+                                    boxShadow: note.pinned
+                                        ? "0 0 0 2px rgba(30, 30, 30, 0.65), 0 8px 20px rgba(0, 0, 0, 0.20)"
+                                        : undefined,
+                                }}
+                            >
+                                {(note.locked || note.pinned) && (
+                                    <div
+                                        style={{
+                                            position: "absolute",
+                                            top: "6px",
+                                            right: "8px",
+                                            display: "flex",
+                                            gap: "4px",
+                                            fontSize: "11px",
+                                            zIndex: 2,
+                                        }}
+                                    >
+                                        {note.locked && (
+                                            <span title="Locked">🔒</span>
+                                        )}
+
+                                        {note.pinned && (
+                                            <span title="Pinned to top">
+                                                📌
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+
+                                <p className="Canvas_Note_Title">
+                                    {note.title}
+                                </p>
+
+                                <p className="Canvas_Note_Body">
+                                    {note.body.length > 90
+                                        ? `${note.body.slice(0, 90)}...`
+                                        : note.body}
+                                </p>
+
                                 <p className="Canvas_Note_Meta">
                                     {note.noteKind === "outline"
                                         ? "Generated Outline"
                                         : note.noteKind === "pdf"
-                                          ? "PDF Source"
-                                          : "Note"}
+                                        ? "PDF Source"
+                                        : "Note"}
                                 </p>
+
                                 <div className="Canvas_Note_Dot"></div>
                             </div>
                         ))}
