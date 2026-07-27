@@ -867,8 +867,10 @@ body,
 }
 
 .Note_Modal_Header {
-    height: 100px;
-    padding: 24px 32px;
+    min-height: 100px;
+    height: auto;
+
+    padding: 20px 32px;
     box-sizing: border-box;
 
     border-bottom: 1.5px solid #b7b7b7;
@@ -876,20 +878,33 @@ body,
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    gap: 24px;
+
+    flex-shrink: 0;
+}
+
+.Note_Modal_Header > div {
+    flex: 1;
+    min-width: 0;
 }
 
 .Note_Modal_Header h2 {
-    margin: 0px 0px 6px 0px;
+    margin: 0 0 8px 0;
 
     font-size: 22px;
+    line-height: 1.18;
     font-weight: 600;
     letter-spacing: 1px;
     text-transform: uppercase;
+
+    overflow-wrap: anywhere;
 }
 
 .Note_Modal_Header p {
-    margin: 0px;
+    margin: 0;
+
     font-size: 15px;
+    line-height: 1.3;
     color: #777;
 }
 

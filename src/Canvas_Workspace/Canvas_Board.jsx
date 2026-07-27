@@ -1653,6 +1653,72 @@ function CanvasBoard(){
         handleCloseNote();
     };
     /***************************************************************************/
+    const handleDeleteOpenedNote = async () => {
+        if (!openedNote) {
+            return;
+        }
+    
+        if (openedNote.locked) {
+            alert(
+                "This note is locked. Unlock it before deleting."
+            );
+            return;
+        }
+    
+        const confirmed = window.confirm(
+            `Delete "${openedNote.title}"?`
+        );
+    
+        if (!confirmed) {
+            return;
+        }
+    
+        const before = getSnapshot();
+        const noteId = openedNote.id;
+    
+        const deleted =
+            await deleteNoteFromDatabase(noteId);
+    
+        if (!deleted) {
+            alert("Failed to delete the note.");
+            return;
+        }
+    
+        setNotes((prevNotes) =>
+            prevNotes.filter(
+                (note) =>
+                    String(note.id) !== String(noteId)
+            )
+        );
+    
+        setFiles((prevFiles) =>
+            prevFiles.filter(
+                (file) =>
+                    String(file.noteId) !==
+                    String(noteId)
+            )
+        );
+    
+        setLinks((prevLinks) =>
+            prevLinks.filter(
+                (link) =>
+                    String(link.fromNoteId) !==
+                        String(noteId) &&
+                    String(link.toNoteId) !==
+                        String(noteId)
+            )
+        );
+    
+        setUndoStack((stack) => [
+            ...stack,
+            before,
+        ]);
+    
+        setRedoStack([]);
+    
+        handleCloseNote();
+    };
+    /***************************************************************************/
     const handleEditorCommand = (
         command,
         value = null
@@ -1670,6 +1736,25 @@ function CanvasBoard(){
         if (editorRef.current) {
             setNoteDraft(editorRef.current.innerHTML);
         }
+    };
+    /***************************************************************************/  
+    const handleNoteToolbarCommand = (
+        event,
+        command,
+        value = null
+    ) => {
+        // Prevent toolbar button from stealing the selected text.
+        event.preventDefault();
+    
+        if (
+            !editorRef.current ||
+            !openedNote ||
+            openedNote.locked
+        ) {
+            return;
+        }
+    
+        handleEditorCommand(command, value);
     };
     /***************************************************************************/   
     const handleNoteEditorHistory = (
@@ -1746,6 +1831,15 @@ function CanvasBoard(){
                 event,
                 "redo"
             );
+    
+            return;
+        }
+    
+        // Mac: Command + U
+        // Windows: Ctrl + U
+        if (key === "u") {
+            event.preventDefault();
+            handleEditorCommand("underline");
         }
     };
     /***************************************************************************/   
@@ -3774,7 +3868,15 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     <div className="Note_Editor_Header">
                                         <input className="Note_Editor_Title_Input" value={openedNote.title} readOnly/>
 
-                                        <button className="Note_Editor_Delete_Button"><MdDelete /></button>
+                                        <button
+                                            type="button"
+                                            className="Note_Editor_Delete_Button"
+                                            onClick={handleDeleteOpenedNote}
+                                            aria-label="Delete note"
+                                            title="Delete note"
+                                        >
+                                            <MdDelete />
+                                        </button>
                                     </div>
 
                                     <div className="Note_Editor_Toolbar">
@@ -3806,22 +3908,139 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                             <TiArrowForward />
                                         </button>
 
-                                        <select onChange={(event) => handleEditorCommand("formatBlock", event.target.value)} defaultValue="p">
+                                        <select
+                                            defaultValue="p"
+                                            aria-label="Text style"
+                                            onChange={(event) =>
+                                                handleEditorCommand(
+                                                    "formatBlock",
+                                                    event.target.value
+                                                )
+                                            }
+                                        >
                                             <option value="p">Normal</option>
                                             <option value="h1">Heading 1</option>
                                             <option value="h2">Heading 2</option>
-                                            <option value="blockquote">Quote</option>
+                                            <option value="blockquote">
+                                                Quote
+                                            </option>
                                         </select>
 
-                                        <button type="button" onClick={() => handleEditorCommand("bold")}><b>B</b></button>
-                                        <button type="button" onClick={() => handleEditorCommand("italic")}><i>I</i></button>
-                                        <button type="button" onClick={() => {const url = prompt("Enter link URL:"); if (url) {handleEditorCommand("createLink", url)}}}><IoLinkSharp /></button>
-                                        <button type="button" onClick={() => handleEditorCommand("formatBlock", "pre")}>&lt;&gt;</button>
-                                        <button type="button" onClick={() => handleEditorCommand("insertUnorderedList")}><FaListUl /></button>
-                                        <button type="button" onClick={() => handleEditorCommand("insertOrderedList")}><FaListOl /></button>
-                                        <button type="button" onClick={() => handleEditorCommand("formatBlock", "blockquote")}>❝</button>
-                                        <button type="button">—</button>
+                                        <button
+                                            type="button"
+                                            title="Bold"
+                                            onMouseDown={(event) =>
+                                                handleNoteToolbarCommand(
+                                                    event,
+                                                    "bold"
+                                                )
+                                            }
+                                        >
+                                            <b>B</b>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            title="Italic"
+                                            onMouseDown={(event) =>
+                                                handleNoteToolbarCommand(
+                                                    event,
+                                                    "italic"
+                                                )
+                                            }
+                                        >
+                                            <i>I</i>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            title="Underline"
+                                            onMouseDown={(event) =>
+                                                handleNoteToolbarCommand(
+                                                    event,
+                                                    "underline"
+                                                )
+                                            }
+                                        >
+                                            <u>U</u>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            title="Add link"
+                                            onMouseDown={(event) => {
+                                                event.preventDefault();
+
+                                                const url = window.prompt(
+                                                    "Enter link URL:"
+                                                );
+
+                                                if (url?.trim()) {
+                                                    handleEditorCommand(
+                                                        "createLink",
+                                                        url.trim()
+                                                    );
+                                                }
+                                            }}
+                                        >
+                                            <IoLinkSharp />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            title="Code block"
+                                            onMouseDown={(event) =>
+                                                handleNoteToolbarCommand(
+                                                    event,
+                                                    "formatBlock",
+                                                    "pre"
+                                                )
+                                            }
+                                        >
+                                            &lt;&gt;
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            title="Bulleted list"
+                                            onMouseDown={(event) =>
+                                                handleNoteToolbarCommand(
+                                                    event,
+                                                    "insertUnorderedList"
+                                                )
+                                            }
+                                        >
+                                            <FaListUl />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            title="Numbered list"
+                                            onMouseDown={(event) =>
+                                                handleNoteToolbarCommand(
+                                                    event,
+                                                    "insertOrderedList"
+                                                )
+                                            }
+                                        >
+                                            <FaListOl />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            title="Quote"
+                                            onMouseDown={(event) =>
+                                                handleNoteToolbarCommand(
+                                                    event,
+                                                    "formatBlock",
+                                                    "blockquote"
+                                                )
+                                            }
+                                        >
+                                            ❝
+                                        </button>
                                     </div>
+
                                     <div
                                         ref={editorRef}
                                         className="Note_Editor_Content"
@@ -3841,7 +4060,9 @@ ${frameworkEditorDraft.slice(0, 60000)}
                         </div>
 
                         <div className="Note_Modal_Footer">
-                            <span>{noteDraft.length} characters</span>
+                            <span>
+                                {stripHtml(noteDraft).length} characters
+                            </span>
 
                             <div className="Note_Modal_Footer_Actions">
                                 <button className="Note_Modal_Cancel_Button" onClick={handleCloseNote}>CANCEL</button>
