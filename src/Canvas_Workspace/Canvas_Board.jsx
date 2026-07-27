@@ -1206,34 +1206,219 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const handleLinkSelectedNotes = async () => {
-        const before = getSnapshot();
-
-        const selectedNotes = notes.filter((note) => note.selected);
-
-        if (selectedNotes.length < 2) {
-            alert("Please select at least 2 notes to link");
+        const selected = notes.filter(
+            (note) => note.selected
+        );
+    
+        if (selected.length < 2) {
+            alert(
+                "Please select at least 2 notes to link or unlink."
+            );
             return;
         }
-
-        const newLinks = [];
-
-        for (let i = 0; i < selectedNotes.length - 1; i++) {
-            const fromNoteId = selectedNotes[i].id;
-            const toNoteId = selectedNotes[i + 1].id;
-
-            if (!linkAlreadyExists(fromNoteId, toNoteId)) {
-                const createdLink = await createLinkInDatabase(fromNoteId, toNoteId);
-
-                if (createdLink) {
-                    newLinks.push(createdLink);
+    
+        /*
+          Preserve the current behavior:
+    
+          2 selected notes:
+          A — B
+    
+          3 selected notes:
+          A — B — C
+    
+          4 selected notes:
+          A — B — C — D
+        */
+        const selectedPairs = selected
+            .slice(0, -1)
+            .map((note, index) => ({
+                fromNoteId: note.id,
+                toNoteId: selected[index + 1].id,
+            }));
+    
+        const pairStates = selectedPairs.map(
+            (pair) => ({
+                ...pair,
+    
+                existingLinks: getLinksBetween(
+                    pair.fromNoteId,
+                    pair.toNoteId
+                ),
+            })
+        );
+    
+        /*
+          If every selected pair already has a Link,
+          clicking the button means Unlink.
+    
+          If at least one pair is missing,
+          clicking the button means Link.
+        */
+        const shouldUnlink = pairStates.every(
+            (pair) =>
+                pair.existingLinks.length > 0
+        );
+    
+        const before = getSnapshot();
+    
+        /* =====================================================
+           UNLINK
+           ===================================================== */
+        if (shouldUnlink) {
+            /*
+              Remove duplicates as well, including the unlikely
+              case where both A → B and B → A exist.
+            */
+            const linksToDelete = Array.from(
+                new Map(
+                    pairStates
+                        .flatMap(
+                            (pair) =>
+                                pair.existingLinks
+                        )
+                        .map((link) => [
+                            String(link.id),
+                            link,
+                        ])
+                ).values()
+            );
+    
+            const successfullyDeletedLinks = [];
+    
+            try {
+                for (const link of linksToDelete) {
+                    const deleted =
+                        await deleteLinkInDatabase(
+                            link.id
+                        );
+    
+                    if (!deleted) {
+                        throw new Error(
+                            "A selected link could not be deleted."
+                        );
+                    }
+    
+                    successfullyDeletedLinks.push(
+                        link
+                    );
                 }
+    
+                const deletedLinkIds = new Set(
+                    successfullyDeletedLinks.map(
+                        (link) => String(link.id)
+                    )
+                );
+    
+                setLinks((prevLinks) =>
+                    prevLinks.filter(
+                        (link) =>
+                            !deletedLinkIds.has(
+                                String(link.id)
+                            )
+                    )
+                );
+    
+                setUndoStack((stack) => [
+                    ...stack,
+                    before,
+                ]);
+    
+                setRedoStack([]);
+            } catch (error) {
+                console.error(
+                    "Unlink selected notes error:",
+                    error
+                );
+    
+                /*
+                  Roll back any links that were already deleted
+                  if another deletion failed.
+                */
+                for (const deletedLink of successfullyDeletedLinks) {
+                    await createLinkInDatabase(
+                        deletedLink.fromNoteId,
+                        deletedLink.toNoteId
+                    );
+                }
+    
+                await loadLinksFromDatabase();
+    
+                alert(
+                    "Failed to unlink the selected notes."
+                );
             }
+    
+            return;
         }
-
-        if (newLinks.length > 0) {
-            setLinks((prevLinks) => [...prevLinks, ...newLinks]);
-            setUndoStack(s => [...s, before]);
+    
+        /* =====================================================
+           LINK
+           ===================================================== */
+    
+        const missingPairs = pairStates.filter(
+            (pair) =>
+                pair.existingLinks.length === 0
+        );
+    
+        const successfullyCreatedLinks = [];
+    
+        try {
+            for (const pair of missingPairs) {
+                const createdLink =
+                    await createLinkInDatabase(
+                        pair.fromNoteId,
+                        pair.toNoteId
+                    );
+    
+                if (!createdLink) {
+                    throw new Error(
+                        "A selected link could not be created."
+                    );
+                }
+    
+                successfullyCreatedLinks.push(
+                    createdLink
+                );
+            }
+    
+            if (
+                successfullyCreatedLinks.length === 0
+            ) {
+                return;
+            }
+    
+            setLinks((prevLinks) => [
+                ...prevLinks,
+                ...successfullyCreatedLinks,
+            ]);
+    
+            setUndoStack((stack) => [
+                ...stack,
+                before,
+            ]);
+    
             setRedoStack([]);
+        } catch (error) {
+            console.error(
+                "Link selected notes error:",
+                error
+            );
+    
+            /*
+              Roll back links already created if a later
+              creation fails.
+            */
+            for (const createdLink of successfullyCreatedLinks) {
+                await deleteLinkInDatabase(
+                    createdLink.id
+                );
+            }
+    
+            await loadLinksFromDatabase();
+    
+            alert(
+                "Failed to link the selected notes."
+            );
         }
     };
     /***************************************************************************/
@@ -1325,13 +1510,38 @@ function CanvasBoard(){
         }
     };
     /***************************************************************************/
-    const linkAlreadyExists = (fromNoteId, toNoteId) => {
-        return links.some((link) => {
-            const sameDirection = link.fromNoteId === fromNoteId && link.toNoteId === toNoteId;
-            const oppositeDirection = link.fromNoteId === toNoteId && link.toNoteId === fromNoteId;
+    const getLinksBetween = (
+        firstNoteId,
+        secondNoteId
+    ) => {
+        return links.filter((link) => {
+            const sameDirection =
+                String(link.fromNoteId) ===
+                    String(firstNoteId) &&
+                String(link.toNoteId) ===
+                    String(secondNoteId);
+    
+            const oppositeDirection =
+                String(link.fromNoteId) ===
+                    String(secondNoteId) &&
+                String(link.toNoteId) ===
+                    String(firstNoteId);
+    
             return sameDirection || oppositeDirection;
         });
-    }
+    };
+    
+    const linkAlreadyExists = (
+        fromNoteId,
+        toNoteId
+    ) => {
+        return (
+            getLinksBetween(
+                fromNoteId,
+                toNoteId
+            ).length > 0
+        );
+    };
     /***************************************************************************/
     const handleOpenNote = (note) => {
         if (note.locked) {
@@ -1666,6 +1876,25 @@ function CanvasBoard(){
         } catch (error) {
             console.error("Create link error:", error);
             return null;
+        }
+    };
+    /***************************************************************************/
+    const deleteLinkInDatabase = async (
+        linkId
+    ) => {
+        try {
+            await apiRequest(`/links/${linkId}`, {
+                method: "DELETE",
+            });
+    
+            return true;
+        } catch (error) {
+            console.error(
+                "Delete link error:",
+                error
+            );
+    
+            return false;
         }
     };
     /***************************************************************************/
