@@ -198,131 +198,378 @@ function CanvasBoard(){
         boardScale,
     });
 
-    const restoreSnapshot = async (
-        snapshot
-    ) => {
+    const restoreSnapshot = async (snapshot) => {
+        if (
+            !snapshot ||
+            !Array.isArray(snapshot.notes) ||
+            !Array.isArray(snapshot.links)
+        ) {
+            alert("Invalid Undo/Redo history.");
+            return false;
+        }
+    
         setIsRestoringHistory(true);
     
+        const getLinkKey = (fromNoteId, toNoteId) =>
+            `${String(fromNoteId)}::${String(toNoteId)}`;
+    
+        const getNotePatch = (note) => ({
+            title: note.title,
+            body: note.body ?? "",
+            user_note: note.userNote ?? "",
+    
+            x: Number(note.x) || 0,
+            y: Number(note.y) || 0,
+    
+            is_locked: Boolean(note.locked),
+            is_pinned: Boolean(note.pinned),
+    
+            // null is important when Undo removes a Cluster.
+            cluster_id: note.clusterId ?? null,
+        });
+    
+        const getNoteCreatePayload = (note) => ({
+            title: note.title,
+            body: note.body ?? "",
+            user_note: note.userNote ?? "",
+    
+            x: Number(note.x) || 0,
+            y: Number(note.y) || 0,
+    
+            source_type: note.sourceType || "pdf",
+            source_name:
+                note.sourceName ||
+                note.title,
+    
+            file_url: note.fileUrl || null,
+            file_size: note.fileSize ?? null,
+            chunks_added: note.chunksAdded ?? null,
+            db_total: note.dbTotal ?? null,
+    
+            is_locked: Boolean(note.locked),
+            is_pinned: Boolean(note.pinned),
+            cluster_id: note.clusterId ?? null,
+        });
+    
         try {
-            const currentNotes = [...notes];
-            const currentLinks = [...links];
+            const currentNoteIds = new Set(
+                notes.map((note) => String(note.id))
+            );
     
-            await Promise.all(
-                currentLinks.map((link) =>
-                    apiRequest(
-                        `/links/${link.id}`,
-                        {
-                            method: "DELETE",
-                        }
-                    ).catch(() => {})
+            const targetNoteIds = new Set(
+                snapshot.notes.map((note) =>
+                    String(note.id)
                 )
             );
     
-            await Promise.all(
-                currentNotes.map((note) =>
-                    apiRequest(
-                        `/notes/${note.id}`,
-                        {
-                            method: "DELETE",
-                        }
-                    ).catch(() => {})
-                )
+            const sameNoteSet =
+                currentNoteIds.size === targetNoteIds.size &&
+                [...targetNoteIds].every((noteId) =>
+                    currentNoteIds.has(noteId)
+                );
+    
+            const currentLinksByKey = new Map(
+                links.map((link) => [
+                    getLinkKey(
+                        link.fromNoteId,
+                        link.toNoteId
+                    ),
+                    link,
+                ])
             );
     
-            const idMap = {};
+            const targetLinksByKey = new Map(
+                snapshot.links.map((link) => [
+                    getLinkKey(
+                        link.fromNoteId,
+                        link.toNoteId
+                    ),
+                    link,
+                ])
+            );
     
-            for (const note of snapshot.notes) {
-                const result =
-                    await apiRequest("/notes", {
-                        method: "POST",
+            const sameLinkSet =
+                currentLinksByKey.size ===
+                    targetLinksByKey.size &&
+                [...targetLinksByKey.keys()].every(
+                    (key) => currentLinksByKey.has(key)
+                );
     
-                        body: JSON.stringify({
-                            title: note.title,
-                            body: note.body,
-                            user_note:
-                                note.userNote,
+            /*
+             * FAST PATH
+             *
+             * Cluster, Uncluster, moving Notes, Lock, Pin Top,
+             * Auto Arrange, Pan and Zoom do not add or delete Notes.
+             *
+             * Therefore, update the existing Notes in place.
+             * Do not delete and recreate the whole Canvas.
+             */
+            if (sameNoteSet) {
+                const restoredNotes = [];
     
-                            x: note.x,
-                            y: note.y,
+                for (const snapshotNote of snapshot.notes) {
+                    const updatedNote =
+                        await updateNoteInDatabase(
+                            snapshotNote.id,
+                            getNotePatch(snapshotNote)
+                        );
     
-                            source_type:
-                                note.sourceType,
+                    if (!updatedNote) {
+                        throw new Error(
+                            `Could not restore note "${snapshotNote.title}".`
+                        );
+                    }
     
-                            source_name:
-                                note.sourceName,
+                    restoredNotes.push({
+                        ...snapshotNote,
+                        ...updatedNote,
     
-                            file_url:
-                                note.fileUrl,
-    
-                            file_size:
-                                note.fileSize,
-    
-                            chunks_added:
-                                note.chunksAdded,
-    
-                            db_total:
-                                note.dbTotal,
-    
-                            is_locked: Boolean(
-                                note.locked
-                            ),
-    
-                            is_pinned: Boolean(
-                                note.pinned
-                            ),
-    
-                            cluster_id:
-                                note.clusterId ||
-                                null,
-                        }),
+                        // Database response does not store selection.
+                        selected: Boolean(
+                            snapshotNote.selected
+                        ),
                     });
+                }
     
-                idMap[note.id] =
-                    result.note.id;
+                /*
+                 * Only touch links when the history operation
+                 * actually changed the links.
+                 */
+                if (!sameLinkSet) {
+                    for (const [
+                        key,
+                        currentLink,
+                    ] of currentLinksByKey) {
+                        if (
+                            !targetLinksByKey.has(key)
+                        ) {
+                            await apiRequest(
+                                `/links/${currentLink.id}`,
+                                {
+                                    method: "DELETE",
+                                }
+                            );
+                        }
+                    }
+    
+                    for (const [
+                        key,
+                        targetLink,
+                    ] of targetLinksByKey) {
+                        if (
+                            !currentLinksByKey.has(key)
+                        ) {
+                            await apiRequest("/links", {
+                                method: "POST",
+                                body: JSON.stringify({
+                                    from_note_id:
+                                        targetLink.fromNoteId,
+    
+                                    to_note_id:
+                                        targetLink.toNoteId,
+                                }),
+                            });
+                        }
+                    }
+    
+                    await loadLinksFromDatabase();
+                }
+    
+                setNotes(restoredNotes);
+    
+                setBoardOffset({
+                    ...(snapshot.boardOffset || {
+                        x: 0,
+                        y: 0,
+                    }),
+                });
+    
+                setBoardScale(
+                    Number(snapshot.boardScale) || 1
+                );
+    
+                return true;
             }
     
-            for (const link of snapshot.links) {
-                const fromNoteId =
-                    idMap[link.fromNoteId];
+            /*
+             * FULL RECONCILIATION
+             *
+             * This branch is used when Undo/Redo adds or removes
+             * Notes, such as Create Note or Delete Note.
+             *
+             * It preserves all Notes that still exist instead of
+             * deleting the entire Canvas.
+             */
     
-                const toNoteId =
-                    idMap[link.toNoteId];
+            // Links must be removed before deleting Notes because
+            // note_links may contain foreign keys to public.notes.
+            for (const currentLink of links) {
+                await apiRequest(
+                    `/links/${currentLink.id}`,
+                    {
+                        method: "DELETE",
+                    }
+                );
+            }
     
+            const currentNotesById = new Map(
+                notes.map((note) => [
+                    String(note.id),
+                    note,
+                ])
+            );
+    
+            /*
+             * Delete only Notes that should not exist
+             * in the target snapshot.
+             */
+            for (const currentNote of notes) {
                 if (
-                    fromNoteId &&
-                    toNoteId
+                    !targetNoteIds.has(
+                        String(currentNote.id)
+                    )
                 ) {
-                    await apiRequest("/links", {
-                        method: "POST",
-    
-                        body: JSON.stringify({
-                            from_note_id:
-                                fromNoteId,
-    
-                            to_note_id:
-                                toNoteId,
-                        }),
-                    });
+                    await apiRequest(
+                        `/notes/${currentNote.id}`,
+                        {
+                            method: "DELETE",
+                        }
+                    );
                 }
             }
     
+            /*
+             * snapshot ID -> actual database ID
+             *
+             * A restored deleted Note receives a new UUID, so its
+             * old snapshot ID must be mapped to the new UUID.
+             */
+            const noteIdMap = new Map();
+            const restoredNotes = [];
+    
+            for (const snapshotNote of snapshot.notes) {
+                const snapshotNoteId = String(
+                    snapshotNote.id
+                );
+    
+                let restoredNote;
+    
+                if (
+                    currentNotesById.has(snapshotNoteId)
+                ) {
+                    restoredNote =
+                        await updateNoteInDatabase(
+                            snapshotNote.id,
+                            getNotePatch(snapshotNote)
+                        );
+    
+                    if (!restoredNote) {
+                        throw new Error(
+                            `Could not update note "${snapshotNote.title}".`
+                        );
+                    }
+                } else {
+                    const data = await apiRequest(
+                        "/notes",
+                        {
+                            method: "POST",
+                            body: JSON.stringify(
+                                getNoteCreatePayload(
+                                    snapshotNote
+                                )
+                            ),
+                        }
+                    );
+    
+                    restoredNote =
+                        convertDatabaseNoteToCanvasNote(
+                            data.note
+                        );
+                }
+    
+                noteIdMap.set(
+                    snapshotNoteId,
+                    restoredNote.id
+                );
+    
+                restoredNotes.push({
+                    ...snapshotNote,
+                    ...restoredNote,
+                    selected: Boolean(
+                        snapshotNote.selected
+                    ),
+                });
+            }
+    
+            /*
+             * Recreate the target links using the actual UUIDs.
+             */
+            for (const snapshotLink of snapshot.links) {
+                const fromNoteId = noteIdMap.get(
+                    String(snapshotLink.fromNoteId)
+                );
+    
+                const toNoteId = noteIdMap.get(
+                    String(snapshotLink.toNoteId)
+                );
+    
+                if (!fromNoteId || !toNoteId) {
+                    throw new Error(
+                        "Could not restore a Note link."
+                    );
+                }
+    
+                await apiRequest("/links", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        from_note_id: fromNoteId,
+                        to_note_id: toNoteId,
+                    }),
+                });
+            }
+    
+            /*
+             * Reload Cabinet and link records, then restore
+             * selection using the reconstructed Notes.
+             */
             await loadNotesFromDatabase();
             await loadLinksFromDatabase();
     
-            setBoardOffset(
-                snapshot.boardOffset
-            );
+            setNotes(restoredNotes);
+    
+            setBoardOffset({
+                ...(snapshot.boardOffset || {
+                    x: 0,
+                    y: 0,
+                }),
+            });
     
             setBoardScale(
-                snapshot.boardScale
+                Number(snapshot.boardScale) || 1
             );
+    
+            return true;
         } catch (error) {
             console.error(
                 "Restore snapshot failed:",
                 error
             );
     
-            alert("Undo/Redo failed.");
+            alert(
+                `Undo/Redo failed: ${
+                    error.message ||
+                    "Unknown restore error."
+                }`
+            );
+    
+            /*
+             * Reload the real database state so the UI does not
+             * remain half-restored.
+             */
+            await loadNotesFromDatabase();
+            await loadLinksFromDatabase();
+    
+            return false;
         } finally {
             setIsRestoringHistory(false);
         }
@@ -2039,25 +2286,71 @@ ${frameworkEditorDraft.slice(0, 60000)}
     }, [notes, links, openedNote]);
 
     const handleUndo = async () => {
-        if (undoStack.length === 0 || isRestoringHistory) return;
+        if (
+            undoStack.length === 0 ||
+            isRestoringHistory
+        ) {
+            return;
+        }
     
-        const prev = undoStack[undoStack.length - 1];
+        const previousSnapshot =
+            undoStack[undoStack.length - 1];
     
-        setUndoStack(s => s.slice(0, -1));
-        setRedoStack(s => [...s, getSnapshot()]);
+        // Save the current state for Redo,
+        // but do not change either stack yet.
+        const currentSnapshot = getSnapshot();
     
-        await restoreSnapshot(prev);
+        const restored = await restoreSnapshot(
+            previousSnapshot
+        );
+    
+        if (!restored) {
+            // Keep both stacks unchanged when restoration fails.
+            return;
+        }
+    
+        setUndoStack((stack) =>
+            stack.slice(0, -1)
+        );
+    
+        setRedoStack((stack) => [
+            ...stack,
+            currentSnapshot,
+        ]);
     };
 
     const handleRedo = async () => {
-        if (redoStack.length === 0 || isRestoringHistory) return;
+        if (
+            redoStack.length === 0 ||
+            isRestoringHistory
+        ) {
+            return;
+        }
     
-        const next = redoStack[redoStack.length - 1];
+        const nextSnapshot =
+            redoStack[redoStack.length - 1];
     
-        setRedoStack(s => s.slice(0, -1));
-        setUndoStack(s => [...s, getSnapshot()]);
+        // Save the current state for Undo,
+        // but do not change either stack yet.
+        const currentSnapshot = getSnapshot();
     
-        await restoreSnapshot(next);
+        const restored = await restoreSnapshot(
+            nextSnapshot
+        );
+    
+        if (!restored) {
+            // Keep both stacks unchanged when restoration fails.
+            return;
+        }
+    
+        setRedoStack((stack) =>
+            stack.slice(0, -1)
+        );
+    
+        setUndoStack((stack) => [
+            ...stack,
+            currentSnapshot,
+        ]);
     };
 
     const handleSelectTool = () => {
