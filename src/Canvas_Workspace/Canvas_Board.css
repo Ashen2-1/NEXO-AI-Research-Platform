@@ -1577,3 +1577,106 @@ body,
         0 2px 6px
         rgba(0, 0, 0, 0.08);
 }
+
+/* =========================================================
+   Fix scrolling inside opened Note modal
+   ========================================================= */
+
+/* Left: Source Text */
+.Note_Source_Column {
+    min-width: 0;
+    min-height: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+}
+
+.Note_Modal_Label {
+    flex-shrink: 0;
+}
+
+.Note_Source_Content {
+    flex: 1 1 0;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    padding-right: 6px;
+    overscroll-behavior: contain;
+}
+
+.Note_Source_Text {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow: visible;
+    overflow-wrap: anywhere;
+}
+
+
+/* Right: Note Editor */
+.Note_User_Column {
+    min-width: 0;
+    min-height: 0;
+
+    display: flex;
+
+    overflow: hidden;
+}
+
+.Note_Editor {
+    flex: 1 1 auto;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+}
+
+.Note_Editor_Header,
+.Note_Editor_Toolbar {
+    flex-shrink: 0;
+}
+
+.Note_Editor_Content {
+    flex: 1 1 0;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+
+/* Scrollbar appearance */
+.Note_Source_Content::-webkit-scrollbar,
+.Note_Editor_Content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.Note_Source_Content::-webkit-scrollbar-track,
+.Note_Editor_Content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.Note_Source_Content::-webkit-scrollbar-thumb,
+.Note_Editor_Content::-webkit-scrollbar-thumb {
+    background: #c7c7c7;
+    border-radius: 999px;
+}
+
+.Note_Source_Content::-webkit-scrollbar-thumb:hover,
+.Note_Editor_Content::-webkit-scrollbar-thumb:hover {
+    background: #999999;
+}
