@@ -3642,7 +3642,12 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                 </p>
                                 <h3>{hoveredNote.title}</h3>
                                 <p className="Note_Preview_Label">ABSTRACT</p>
-                                <p className="Note_Preview_Text">{hoveredNote.body}</p>
+                                <p className="Note_Preview_Text">
+                                    {stripHtml(hoveredNote.body || "").length > 200
+                                        ? `${stripHtml(hoveredNote.body || "").slice(0, 199)}…`
+                                        : stripHtml(hoveredNote.body || "") ||
+                                        "No abstract available."}
+                                </p>
                                 <p className="Note_Preview_Label">CONNECTIONS</p>
                                 <p className="Note_Preview_Number">
                                     {
