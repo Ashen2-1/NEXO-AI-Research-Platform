@@ -2749,6 +2749,16 @@ ${frameworkEditorDraft.slice(0, 60000)}
             return;
         }
     
+        // 保存 Lock / Unlock 之前的完整状态
+        const before = getSnapshot();
+    
+        /*
+          如果选中的 Note 全部已经 Locked：
+          点击后执行 Unlock。
+    
+          只要有一个未 Locked：
+          点击后全部执行 Lock。
+        */
         const nextLockedState = !selected.every(
             (note) => note.locked
         );
@@ -2762,16 +2772,27 @@ ${frameworkEditorDraft.slice(0, 60000)}
     
                 return {
                     noteId: note.id,
-                    success: Boolean(updatedNote),
+                    updatedNote,
                 };
             })
         );
     
         const successfulIds = new Set(
             updateResults
-                .filter((result) => result.success)
+                .filter((result) =>
+                    Boolean(result.updatedNote)
+                )
                 .map((result) => result.noteId)
         );
+    
+        if (successfulIds.size === 0) {
+            alert(
+                nextLockedState
+                    ? "Failed to lock the selected notes."
+                    : "Failed to unlock the selected notes."
+            );
+            return;
+        }
     
         setNotes((prevNotes) =>
             prevNotes.map((note) =>
@@ -2784,8 +2805,19 @@ ${frameworkEditorDraft.slice(0, 60000)}
             )
         );
     
+        // 加入 Undo history
+        setUndoStack((stack) => [
+            ...stack,
+            before,
+        ]);
+    
+        // 新操作发生后，清空 Redo history
+        setRedoStack([]);
+    
         if (successfulIds.size !== selected.length) {
-            alert("Some notes could not be updated.");
+            alert(
+                "Some selected notes could not be updated."
+            );
         }
     };
 
@@ -2799,6 +2831,16 @@ ${frameworkEditorDraft.slice(0, 60000)}
             return;
         }
     
+        // 保存 Pin / Unpin 之前的完整状态
+        const before = getSnapshot();
+    
+        /*
+          如果选中的 Note 全部已经 Pinned：
+          点击后执行 Unpin。
+    
+          只要有一个未 Pinned：
+          点击后全部执行 Pin Top。
+        */
         const nextPinnedState = !selected.every(
             (note) => note.pinned
         );
@@ -2812,16 +2854,27 @@ ${frameworkEditorDraft.slice(0, 60000)}
     
                 return {
                     noteId: note.id,
-                    success: Boolean(updatedNote),
+                    updatedNote,
                 };
             })
         );
     
         const successfulIds = new Set(
             updateResults
-                .filter((result) => result.success)
+                .filter((result) =>
+                    Boolean(result.updatedNote)
+                )
                 .map((result) => result.noteId)
         );
+    
+        if (successfulIds.size === 0) {
+            alert(
+                nextPinnedState
+                    ? "Failed to pin the selected notes."
+                    : "Failed to unpin the selected notes."
+            );
+            return;
+        }
     
         setNotes((prevNotes) =>
             prevNotes.map((note) =>
@@ -2834,8 +2887,19 @@ ${frameworkEditorDraft.slice(0, 60000)}
             )
         );
     
+        // 加入 Undo history
+        setUndoStack((stack) => [
+            ...stack,
+            before,
+        ]);
+    
+        // 新操作发生后，清空 Redo history
+        setRedoStack([]);
+    
         if (successfulIds.size !== selected.length) {
-            alert("Some notes could not be updated.");
+            alert(
+                "Some selected notes could not be updated."
+            );
         }
     };
 
