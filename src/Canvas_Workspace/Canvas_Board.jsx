@@ -146,6 +146,16 @@ function CanvasBoard(){
 
     const dragStartSnapshot = useRef(null);
 
+    const clusterDragRef = useRef({
+        noteIds: [],
+        startWorldX: 0,
+        startWorldY: 0,
+        startPositions: {},
+        lastDeltaX: 0,
+        lastDeltaY: 0,
+        hasMoved: false,
+    });
+
     const frameworkLastSavedContentRef = useRef("");
     const frameworkLatestDraftRef = useRef("");
     const frameworkGenerationAbortRef = useRef(null);
@@ -188,84 +198,134 @@ function CanvasBoard(){
         boardScale,
     });
 
-    const restoreSnapshot = async (snapshot) => {
+    const restoreSnapshot = async (
+        snapshot
+    ) => {
         setIsRestoringHistory(true);
     
         try {
             const currentNotes = [...notes];
             const currentLinks = [...links];
     
-            // ---------- 1. 删除当前 links ----------
             await Promise.all(
-                currentLinks.map(link =>
-                    apiRequest(`/links/${link.id}`, {
-                        method: "DELETE"
-                    }).catch(() => {})
+                currentLinks.map((link) =>
+                    apiRequest(
+                        `/links/${link.id}`,
+                        {
+                            method: "DELETE",
+                        }
+                    ).catch(() => {})
                 )
             );
     
-            // ---------- 2. 删除当前 notes ----------
             await Promise.all(
-                currentNotes.map(note =>
-                    apiRequest(`/notes/${note.id}`, {
-                        method: "DELETE"
-                    }).catch(() => {})
+                currentNotes.map((note) =>
+                    apiRequest(
+                        `/notes/${note.id}`,
+                        {
+                            method: "DELETE",
+                        }
+                    ).catch(() => {})
                 )
             );
     
-            // ---------- 3. 重建 notes ----------
             const idMap = {};
     
             for (const note of snapshot.notes) {
-                const res = await apiRequest("/notes", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        title: note.title,
-                        body: note.body,
-                        user_note: note.userNote,
-                        x: note.x,
-                        y: note.y,
-                        source_type: note.sourceType,
-                        source_name: note.sourceName,
-                        file_url: note.fileUrl,
-                        file_size: note.fileSize,
-                        chunks_added: note.chunksAdded,
-                        db_total: note.dbTotal,
-                    }),
-                });
+                const result =
+                    await apiRequest("/notes", {
+                        method: "POST",
     
-                idMap[note.id] = res.note.id;
+                        body: JSON.stringify({
+                            title: note.title,
+                            body: note.body,
+                            user_note:
+                                note.userNote,
+    
+                            x: note.x,
+                            y: note.y,
+    
+                            source_type:
+                                note.sourceType,
+    
+                            source_name:
+                                note.sourceName,
+    
+                            file_url:
+                                note.fileUrl,
+    
+                            file_size:
+                                note.fileSize,
+    
+                            chunks_added:
+                                note.chunksAdded,
+    
+                            db_total:
+                                note.dbTotal,
+    
+                            is_locked: Boolean(
+                                note.locked
+                            ),
+    
+                            is_pinned: Boolean(
+                                note.pinned
+                            ),
+    
+                            cluster_id:
+                                note.clusterId ||
+                                null,
+                        }),
+                    });
+    
+                idMap[note.id] =
+                    result.note.id;
             }
     
-            // ---------- 4. 重建 links ----------
             for (const link of snapshot.links) {
-                const from = idMap[link.fromNoteId];
-                const to = idMap[link.toNoteId];
+                const fromNoteId =
+                    idMap[link.fromNoteId];
     
-                if (from && to) {
+                const toNoteId =
+                    idMap[link.toNoteId];
+    
+                if (
+                    fromNoteId &&
+                    toNoteId
+                ) {
                     await apiRequest("/links", {
                         method: "POST",
+    
                         body: JSON.stringify({
-                            from_note_id: from,
-                            to_note_id: to,
+                            from_note_id:
+                                fromNoteId,
+    
+                            to_note_id:
+                                toNoteId,
                         }),
                     });
                 }
             }
     
-            // ---------- 5. reload ----------
             await loadNotesFromDatabase();
             await loadLinksFromDatabase();
     
-            setBoardOffset(snapshot.boardOffset);
-            setBoardScale(snapshot.boardScale);
+            setBoardOffset(
+                snapshot.boardOffset
+            );
     
-        } catch (err) {
-            console.error("Restore snapshot failed:", err);
+            setBoardScale(
+                snapshot.boardScale
+            );
+        } catch (error) {
+            console.error(
+                "Restore snapshot failed:",
+                error
+            );
+    
             alert("Undo/Redo failed.");
+        } finally {
+            setIsRestoringHistory(false);
         }
-    
-        setIsRestoringHistory(false);
     };
 
     /** When file upload success it will be package in the way we want so later can put into the PGSQL*/
@@ -592,85 +652,250 @@ function CanvasBoard(){
         }
     };
     /***************************************************************************/
-    const handleNoteMouseDown = (event, note) => {
+    const handleNoteMouseDown = (
+        event,
+        note
+    ) => {
         event.stopPropagation();
+    
         setHasDraggedNote(false);
     
         if (note.locked) {
             return;
         }
     
-        dragStartSnapshot.current = getSnapshot();
+        const notesToMove = note.clusterId
+            ? notes.filter(
+                  (candidate) =>
+                      candidate.clusterId ===
+                      note.clusterId
+              )
+            : [note];
+    
+        /*
+          A Cluster containing a locked Note cannot move,
+          because group movement would otherwise move the
+          locked Note too.
+        */
+        if (
+            notesToMove.some(
+                (candidate) => candidate.locked
+            )
+        ) {
+            alert(
+                "This cluster contains a locked note. Unlock it before moving the cluster."
+            );
+            return;
+        }
     
         const canvasRect = event.currentTarget
             .closest(".Canvas_Center")
             .getBoundingClientRect();
     
+        const startWorldX =
+            (event.clientX -
+                canvasRect.left -
+                boardOffset.x) /
+            boardScale;
+    
+        const startWorldY =
+            (event.clientY -
+                canvasRect.top -
+                boardOffset.y) /
+            boardScale;
+    
+        dragStartSnapshot.current = getSnapshot();
+    
+        clusterDragRef.current = {
+            noteIds: notesToMove.map(
+                (candidate) => candidate.id
+            ),
+    
+            startWorldX,
+            startWorldY,
+    
+            startPositions: Object.fromEntries(
+                notesToMove.map((candidate) => [
+                    candidate.id,
+                    {
+                        x: candidate.x,
+                        y: candidate.y,
+                    },
+                ])
+            ),
+    
+            lastDeltaX: 0,
+            lastDeltaY: 0,
+            hasMoved: false,
+        };
+    
         setDraggingNoteId(note.id);
-    
-        setDragOffset({
-            x:
-                (event.clientX -
-                    canvasRect.left -
-                    boardOffset.x) /
-                    boardScale -
-                note.x,
-    
-            y:
-                (event.clientY -
-                    canvasRect.top -
-                    boardOffset.y) /
-                    boardScale -
-                note.y,
-        });
     };
     /***************************************************************************/
     const handleCanvasMouseMove = (event) => {
         if (draggingNoteId !== null) {
-            setHasDraggedNote(true);
-
-            const canvasRect = event.currentTarget.getBoundingClientRect();
-
-            const newX = (event.clientX - canvasRect.left - boardOffset.x) / boardScale - dragOffset.x;
-            const newY = (event.clientY - canvasRect.top - boardOffset.y) / boardScale - dragOffset.y;
-
+            const dragInfo =
+                clusterDragRef.current;
+    
+            if (
+                dragInfo.noteIds.length === 0
+            ) {
+                return;
+            }
+    
+            const canvasRect =
+                event.currentTarget.getBoundingClientRect();
+    
+            const currentWorldX =
+                (event.clientX -
+                    canvasRect.left -
+                    boardOffset.x) /
+                boardScale;
+    
+            const currentWorldY =
+                (event.clientY -
+                    canvasRect.top -
+                    boardOffset.y) /
+                boardScale;
+    
+            const deltaX =
+                currentWorldX -
+                dragInfo.startWorldX;
+    
+            const deltaY =
+                currentWorldY -
+                dragInfo.startWorldY;
+    
+            dragInfo.lastDeltaX = deltaX;
+            dragInfo.lastDeltaY = deltaY;
+    
+            if (
+                Math.abs(deltaX) > 0.5 ||
+                Math.abs(deltaY) > 0.5
+            ) {
+                dragInfo.hasMoved = true;
+                setHasDraggedNote(true);
+            }
+    
             setNotes((prevNotes) =>
-                prevNotes.map((note) =>
-                    note.id === draggingNoteId
-                        ? { ...note, x: newX, y: newY }
-                        : note
-                )
+                prevNotes.map((note) => {
+                    const startPosition =
+                        dragInfo.startPositions[
+                            note.id
+                        ];
+    
+                    if (!startPosition) {
+                        return note;
+                    }
+    
+                    return {
+                        ...note,
+    
+                        x:
+                            startPosition.x +
+                            deltaX,
+    
+                        y:
+                            startPosition.y +
+                            deltaY,
+                    };
+                })
             );
+    
             return;
         }
-
+    
         if (isPanningBoard) {
             setBoardOffset({
-                x: event.clientX - panStart.x,
-                y: event.clientY - panStart.y,
+                x:
+                    event.clientX -
+                    panStart.x,
+    
+                y:
+                    event.clientY -
+                    panStart.y,
             });
         }
     };
     /***************************************************************************/
     const handleCanvasMouseUp = async () => {
-        if (draggingNoteId !== null && hasDraggedNote) {
-            const before = dragStartSnapshot.current;
-        
-            const draggedNote = notes.find(n => n.id === draggingNoteId);
-        
-            if (draggedNote) {
-                await updateNoteInDatabase(draggedNote.id, {
-                    x: draggedNote.x,
-                    y: draggedNote.y,
-                });
-        
-                setUndoStack(s => [...s, before]);
+        const dragInfo =
+            clusterDragRef.current;
+    
+        if (
+            draggingNoteId !== null &&
+            dragInfo.hasMoved
+        ) {
+            const movedNotes = dragInfo.noteIds.map(
+                (noteId) => {
+                    const startPosition =
+                        dragInfo.startPositions[
+                            noteId
+                        ];
+    
+                    return {
+                        id: noteId,
+    
+                        x:
+                            startPosition.x +
+                            dragInfo.lastDeltaX,
+    
+                        y:
+                            startPosition.y +
+                            dragInfo.lastDeltaY,
+                    };
+                }
+            );
+    
+            const updateResults =
+                await Promise.all(
+                    movedNotes.map((note) =>
+                        updateNoteInDatabase(
+                            note.id,
+                            {
+                                x: note.x,
+                                y: note.y,
+                            }
+                        )
+                    )
+                );
+    
+            const failed = updateResults.some(
+                (result) => !result
+            );
+    
+            if (failed) {
+                await loadNotesFromDatabase();
+    
+                alert(
+                    "The cluster position could not be fully saved."
+                );
+            } else if (
+                dragStartSnapshot.current
+            ) {
+                setUndoStack((stack) => [
+                    ...stack,
+                    dragStartSnapshot.current,
+                ]);
+    
                 setRedoStack([]);
             }
         }
-
+    
         setDraggingNoteId(null);
         setIsPanningBoard(false);
+    
+        clusterDragRef.current = {
+            noteIds: [],
+            startWorldX: 0,
+            startWorldY: 0,
+            startPositions: {},
+            lastDeltaX: 0,
+            lastDeltaY: 0,
+            hasMoved: false,
+        };
+    
+        dragStartSnapshot.current = null;
     };
     /***************************************************************************/
     const handleCanvasWheel = (event) => {
@@ -953,35 +1178,41 @@ function CanvasBoard(){
     const convertDatabaseNoteToCanvasNote = (note) => {
         const sourceType = note.source_type || "pdf";
         const sourceName = note.source_name || note.title;
-
+    
         const noteKind =
             sourceType === "framework" ||
             sourceName === FRAMEWORK_STORAGE_SOURCE ||
             sourceName === "nexo-framework"
                 ? "framework"
-                : sourceType === "outline" || sourceName === OUTLINE_STORAGE_SOURCE
+                : sourceType === "outline" ||
+                    sourceName === OUTLINE_STORAGE_SOURCE
                   ? "outline"
                   : sourceType;
-
+    
         return {
             id: note.id,
             title: note.title,
             body: note.body || "",
             userNote: note.user_note || "",
+    
             x: Number(note.x),
             y: Number(note.y),
+    
             selected: false,
-            
             locked: Boolean(note.is_locked),
             pinned: Boolean(note.is_pinned),
-
+    
+            clusterId: note.cluster_id || null,
+    
             sourceType,
             sourceName,
             noteKind,
+    
             fileUrl: note.file_url || "",
             fileSize: note.file_size || null,
             chunksAdded: note.chunks_added || null,
             dbTotal: note.db_total || null,
+    
             createdAt: note.created_at,
             updatedAt: note.updated_at,
         };
@@ -1192,6 +1423,71 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const selectedNotes = notes.filter((note) => note.selected);
+
+    const clusterGroups = Object.entries(
+        notes.reduce((groups, note) => {
+            if (!note.clusterId) {
+                return groups;
+            }
+    
+            if (!groups[note.clusterId]) {
+                groups[note.clusterId] = [];
+            }
+    
+            groups[note.clusterId].push(note);
+    
+            return groups;
+        }, {})
+    )
+        .filter(([, groupNotes]) => groupNotes.length >= 2)
+        .sort(([clusterIdA], [clusterIdB]) =>
+            clusterIdA.localeCompare(clusterIdB)
+        )
+        .map(([clusterId, groupNotes], index) => {
+            const minX = Math.min(
+                ...groupNotes.map((note) => note.x)
+            );
+    
+            const minY = Math.min(
+                ...groupNotes.map((note) => note.y)
+            );
+    
+            const maxX = Math.max(
+                ...groupNotes.map(
+                    (note) => note.x + NOTE_WIDTH
+                )
+            );
+    
+            const maxY = Math.max(
+                ...groupNotes.map(
+                    (note) => note.y + NOTE_HEIGHT
+                )
+            );
+    
+            const horizontalPadding = 24;
+            const topPadding = 42;
+            const bottomPadding = 24;
+    
+            return {
+                id: clusterId,
+                label: `Cluster ${index + 1}`,
+                noteCount: groupNotes.length,
+    
+                x: minX - horizontalPadding,
+                y: minY - topPadding,
+    
+                width:
+                    maxX -
+                    minX +
+                    horizontalPadding * 2,
+    
+                height:
+                    maxY -
+                    minY +
+                    topPadding +
+                    bottomPadding,
+            };
+        });
 
     const selectedFrameworkSources = selectedNotes.map((note) => ({
         id: note.id,
@@ -1799,62 +2095,354 @@ ${frameworkEditorDraft.slice(0, 60000)}
         }
     };
 
-    const handleCluster = () => {
-        alert("Cluster will be added later.");
-    };
-
-    const handleAutoArrange = async () => {
-        const movableNotes = notes.filter(
-            (note) => !note.locked
+    const handleCluster = async () => {
+        const selected = notes.filter(
+            (note) => note.selected
         );
     
-        if (movableNotes.length === 0) {
-            alert("All notes are locked.");
+        if (selected.length === 0) {
+            alert("Select at least one note.");
+            return;
+        }
+    
+        const selectedClusterId =
+            selected[0].clusterId;
+    
+        const selectedAreSameCluster =
+            Boolean(selectedClusterId) &&
+            selected.every(
+                (note) =>
+                    note.clusterId === selectedClusterId
+            );
+    
+        const shouldUncluster =
+            selectedAreSameCluster;
+    
+        if (!shouldUncluster && selected.length < 2) {
+            alert(
+                "Select at least two notes to create a cluster."
+            );
+            return;
+        }
+    
+        /*
+          Selecting any note from an existing Cluster and
+          clicking Cluster again removes the entire Cluster.
+        */
+        const targetNotes = shouldUncluster
+            ? notes.filter(
+                  (note) =>
+                      note.clusterId === selectedClusterId
+              )
+            : selected;
+    
+        if (
+            targetNotes.some((note) => note.locked)
+        ) {
+            alert(
+                "Unlock all notes before changing their cluster."
+            );
             return;
         }
     
         const before = getSnapshot();
     
-        const positionMap = new Map(
-            movableNotes.map((note, index) => [
-                note.id,
-                {
-                    x: 280 + (index % 4) * 220,
+        const generatedClusterId =
+            typeof crypto !== "undefined" &&
+            typeof crypto.randomUUID === "function"
+                ? crypto.randomUUID()
+                : `cluster-${Date.now()}-${Math.random()
+                      .toString(16)
+                      .slice(2)}`;
+    
+        const nextClusterId = shouldUncluster
+            ? null
+            : generatedClusterId;
+    
+        const positionMap = new Map();
+    
+        /*
+          Creating a Cluster also arranges its Notes
+          into a compact grid.
+        */
+        if (!shouldUncluster) {
+            const anchorX = Math.min(
+                ...targetNotes.map((note) => note.x)
+            );
+    
+            const anchorY = Math.min(
+                ...targetNotes.map((note) => note.y)
+            );
+    
+            const columns = Math.ceil(
+                Math.sqrt(targetNotes.length)
+            );
+    
+            const horizontalGap = 28;
+            const verticalGap = 28;
+    
+            targetNotes.forEach((note, index) => {
+                const column = index % columns;
+                const row = Math.floor(index / columns);
+    
+                positionMap.set(note.id, {
+                    x:
+                        anchorX +
+                        column *
+                            (NOTE_WIDTH + horizontalGap),
+    
                     y:
-                        120 +
-                        Math.floor(index / 4) * 190,
-                },
-            ])
-        );
+                        anchorY +
+                        row *
+                            (NOTE_HEIGHT + verticalGap),
+                });
+            });
+        }
     
-        const updatedNotes = notes.map((note) => {
-            const nextPosition = positionMap.get(note.id);
-    
-            if (!nextPosition) {
-                return note;
-            }
-    
-            return {
-                ...note,
-                ...nextPosition,
-            };
-        });
-    
-        setNotes(updatedNotes);
-    
-        await Promise.all(
-            movableNotes.map((note) => {
+        const updateResults = await Promise.all(
+            targetNotes.map((note) => {
                 const nextPosition =
                     positionMap.get(note.id);
     
-                return updateNoteInDatabase(
-                    note.id,
-                    nextPosition
-                );
+                return updateNoteInDatabase(note.id, {
+                    cluster_id: nextClusterId,
+    
+                    ...(nextPosition
+                        ? {
+                              x: nextPosition.x,
+                              y: nextPosition.y,
+                          }
+                        : {}),
+                });
             })
         );
     
-        setUndoStack((stack) => [...stack, before]);
+        const failed = updateResults.some(
+            (result) => !result
+        );
+    
+        if (failed) {
+            await loadNotesFromDatabase();
+    
+            alert(
+                "Some notes could not be clustered."
+            );
+    
+            return;
+        }
+    
+        const targetIds = new Set(
+            targetNotes.map((note) => note.id)
+        );
+    
+        setNotes((prevNotes) =>
+            prevNotes.map((note) => {
+                if (!targetIds.has(note.id)) {
+                    return note;
+                }
+    
+                const nextPosition =
+                    positionMap.get(note.id);
+    
+                return {
+                    ...note,
+                    clusterId: nextClusterId,
+    
+                    ...(nextPosition
+                        ? {
+                              x: nextPosition.x,
+                              y: nextPosition.y,
+                          }
+                        : {}),
+                };
+            })
+        );
+    
+        setUndoStack((stack) => [
+            ...stack,
+            before,
+        ]);
+    
+        setRedoStack([]);
+    };
+
+    const handleAutoArrange = async () => {
+        const before = getSnapshot();
+    
+        const layoutUnits = [];
+        const handledClusterIds = new Set();
+    
+        notes.forEach((note) => {
+            if (note.locked) {
+                return;
+            }
+    
+            if (!note.clusterId) {
+                layoutUnits.push([note]);
+                return;
+            }
+    
+            if (
+                handledClusterIds.has(
+                    note.clusterId
+                )
+            ) {
+                return;
+            }
+    
+            const clusterMembers = notes.filter(
+                (candidate) =>
+                    candidate.clusterId ===
+                    note.clusterId
+            );
+    
+            handledClusterIds.add(
+                note.clusterId
+            );
+    
+            /*
+              If one member is locked, the whole Cluster
+              remains in its current position.
+            */
+            if (
+                clusterMembers.some(
+                    (candidate) =>
+                        candidate.locked
+                )
+            ) {
+                return;
+            }
+    
+            layoutUnits.push(clusterMembers);
+        });
+    
+        if (layoutUnits.length === 0) {
+            alert(
+                "There are no movable notes."
+            );
+            return;
+        }
+    
+        const positionMap = new Map();
+    
+        const unitColumnCount = 3;
+        const unitHorizontalSpace = 520;
+        const unitVerticalSpace = 360;
+    
+        layoutUnits.forEach(
+            (unitNotes, unitIndex) => {
+                const unitX =
+                    280 +
+                    (unitIndex %
+                        unitColumnCount) *
+                        unitHorizontalSpace;
+    
+                const unitY =
+                    120 +
+                    Math.floor(
+                        unitIndex /
+                            unitColumnCount
+                    ) *
+                        unitVerticalSpace;
+    
+                if (unitNotes.length === 1) {
+                    positionMap.set(
+                        unitNotes[0].id,
+                        {
+                            x: unitX,
+                            y: unitY,
+                        }
+                    );
+    
+                    return;
+                }
+    
+                const columns = Math.ceil(
+                    Math.sqrt(
+                        unitNotes.length
+                    )
+                );
+    
+                unitNotes.forEach(
+                    (note, noteIndex) => {
+                        const column =
+                            noteIndex % columns;
+    
+                        const row = Math.floor(
+                            noteIndex / columns
+                        );
+    
+                        positionMap.set(note.id, {
+                            x:
+                                unitX +
+                                column *
+                                    (NOTE_WIDTH +
+                                        28),
+    
+                            y:
+                                unitY +
+                                row *
+                                    (NOTE_HEIGHT +
+                                        28),
+                        });
+                    }
+                );
+            }
+        );
+    
+        const updatedNotes = notes.map(
+            (note) => {
+                const nextPosition =
+                    positionMap.get(note.id);
+    
+                if (!nextPosition) {
+                    return note;
+                }
+    
+                return {
+                    ...note,
+                    ...nextPosition,
+                };
+            }
+        );
+    
+        setNotes(updatedNotes);
+    
+        const updateResults =
+            await Promise.all(
+                Array.from(
+                    positionMap.entries()
+                ).map(
+                    ([
+                        noteId,
+                        nextPosition,
+                    ]) =>
+                        updateNoteInDatabase(
+                            noteId,
+                            nextPosition
+                        )
+                )
+            );
+    
+        const failed = updateResults.some(
+            (result) => !result
+        );
+    
+        if (failed) {
+            await loadNotesFromDatabase();
+    
+            alert(
+                "Some note positions could not be saved."
+            );
+    
+            return;
+        }
+    
+        setUndoStack((stack) => [
+            ...stack,
+            before,
+        ]);
+    
         setRedoStack([]);
     };
 
@@ -2088,6 +2676,25 @@ ${frameworkEditorDraft.slice(0, 60000)}
                 <section className="Canvas_Center" style={{backgroundPosition: `${boardOffset.x}px ${boardOffset.y}px` , backgroundSize: `${14 * boardScale}px ${14 * boardScale}px`}} onMouseDown={handleBoardMouseDown} onWheel={handleCanvasWheel} onDragOver={handleCanvasDragOver} onDrop={handleCanvasDrop} onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp}>
                     
                     <div className="Canvas_World" style={{transform: `translate(${boardOffset.x}px, ${boardOffset.y}px) scale(${boardScale})`,}}>
+                        
+                        {clusterGroups.map((cluster) => (
+                            <div
+                                key={cluster.id}
+                                className="Canvas_Cluster_Box"
+                                style={{
+                                    left: `${cluster.x}px`,
+                                    top: `${cluster.y}px`,
+                                    width: `${cluster.width}px`,
+                                    height: `${cluster.height}px`,
+                                }}
+                            >
+                                <span className="Canvas_Cluster_Label">
+                                    {cluster.label} ·{" "}
+                                    {cluster.noteCount} notes
+                                </span>
+                            </div>
+                        ))}
+                        
                         <svg className="Canvas_Link_Layer">
                             {links.map((link) => {
                                 const fromNote = getNoteById(link.fromNoteId);
