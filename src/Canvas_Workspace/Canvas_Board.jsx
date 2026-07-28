@@ -3832,7 +3832,10 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     </div>
                                 )}
 
-                                <p className="Canvas_Note_Title">
+                                <p
+                                    className="Canvas_Note_Title"
+                                    title={note.title}
+                                >
                                     {note.title}
                                 </p>
 
@@ -3857,9 +3860,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                 <p className="Note_Preview_Label">
                                     {hoveredNote.noteKind === "outline" ? "OUTLINE" : "PAPER"}
                                 </p>
-                                <h3>{hoveredNote.title}</h3>
+                                <h3 title={hoveredNote.title}>
+                                    {hoveredNote.title}
+                                </h3>
                                 <p className="Note_Preview_Label">ABSTRACT</p>
-                                <p className="Note_Preview_Text">
+                                <p
+                                    className="Note_Preview_Text"
+                                    title={stripHtml(hoveredNote.body || "")}
+                                >
                                     {stripHtml(hoveredNote.body || "").length > 200
                                         ? `${stripHtml(hoveredNote.body || "").slice(0, 199)}…`
                                         : stripHtml(hoveredNote.body || "") ||
