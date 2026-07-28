@@ -1,23 +1,26 @@
+html,
+body,
+#root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
 .Canvas_Page {
-    width: 98%; /*Can change the overall page size*/
-    height: calc(100vh - 10px);
-    margin: 5px auto;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+
+    margin: 0;
     background-color: white;
     border: 3px solid #222;
-    overflow: hidden;
 
-}
-
-.Canvas_Main {
-    height: calc(100% - 90px);
-    position: relative;
-    min-height: 0;
-    background-color: #fafafa;
-    overflow: hidden;
-}
-
-.Canvas_Page {
-    height: 100vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -26,16 +29,18 @@
 .Canvas_Main {
     flex: 1;
     min-height: 0;
+
     display: flex;
     position: relative;
+
+    background-color: #fafafa;
     overflow: hidden;
 }
-
 
 .Logout_Button {
     position: absolute;
     top: 30px;
-    right: 64px;
+    right: clamp(16px, 4vw, 64px);
     z-index: 30;
 
     height: 38px;
@@ -56,7 +61,7 @@
 .Database_Button {
     position: absolute;
     top: 30px;
-    left: 64px;
+    left: clamp(16px, 4vw, 64px);
     z-index: 5;
 
     height: 48px;
@@ -98,7 +103,7 @@
 }
 
 .Canvas_Left_Open {
-    width: 329px;
+    width: clamp(240px, 22vw, 329px);
 }
 
 .Canvas_Left_Closed {
@@ -175,7 +180,7 @@
 }
 
 .Canvas_Right_Open {
-    width: 800px;
+    width: clamp(360px, 50vw, 800px);
 }
 
 .Canvas_Right_Closed {
@@ -448,8 +453,13 @@
     bottom: 24px;
     transform: translateX(-50%);
 
-    min-width: 450px;
-    height: 48px;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    min-width: 0;
+    min-height: 48px;
+    height: auto;
+
+    padding: 0 16px;
 
     background-color: rgba(255, 255, 255, 0.92);
     border: 1px solid #0000001A;
@@ -459,7 +469,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 22px;
+    gap: clamp(8px, 1.5vw, 22px);
 
     font-size: 13px;
     color: #555;
@@ -843,11 +853,10 @@
 }
 
 .Note_Modal {
-    width: 1000px;
-    height: 900px;
+    width: min(1000px, 94vw);
+    height: min(900px, 90dvh);
 
     background-color: #f7f7f7;
-    
     border-radius: 28px;
     overflow: hidden;
 
@@ -858,8 +867,10 @@
 }
 
 .Note_Modal_Header {
-    height: 100px;
-    padding: 24px 32px;
+    min-height: 100px;
+    height: auto;
+
+    padding: 20px 32px;
     box-sizing: border-box;
 
     border-bottom: 1.5px solid #b7b7b7;
@@ -867,20 +878,33 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    gap: 24px;
+
+    flex-shrink: 0;
+}
+
+.Note_Modal_Header > div {
+    flex: 1;
+    min-width: 0;
 }
 
 .Note_Modal_Header h2 {
-    margin: 0px 0px 6px 0px;
+    margin: 0 0 8px 0;
 
     font-size: 22px;
+    line-height: 1.18;
     font-weight: 600;
     letter-spacing: 1px;
     text-transform: uppercase;
+
+    overflow-wrap: anywhere;
 }
 
 .Note_Modal_Header p {
-    margin: 0px;
+    margin: 0;
+
     font-size: 15px;
+    line-height: 1.3;
     color: #777;
 }
 
@@ -1153,13 +1177,15 @@
 }
 
 .Framework_Expanded_Modal {
-    width: 720px;
-    height: 680px;
+    width: min(720px, 94vw);
+    height: min(680px, 90dvh);
+
     background: white;
     border: 1px solid #111;
     border-radius: 14px;
     overflow: hidden;
     box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+
     display: flex;
     flex-direction: column;
 }
@@ -1316,4 +1342,341 @@
     background: #444;
     color: white;
     border-color: #444;
+}
+/* Backend-connected expanded Framework editor */
+.Framework_Expanded_Refine_Bar {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.Framework_Expanded_Refine_Bar input {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+    border: 1px solid #d5d5d5;
+    border-radius: 8px;
+    padding: 0 11px;
+    font-size: 12px;
+    outline: none;
+}
+
+.Framework_Expanded_Refine_Bar input:focus {
+    border-color: #555;
+}
+
+.Framework_Expanded_Refine_Bar button {
+    min-width: 104px;
+    border: none;
+    border-radius: 8px;
+    background: #444;
+    color: white;
+    padding: 0 12px;
+    cursor: pointer;
+}
+
+.Framework_Expanded_Refine_Bar button:disabled,
+.Framework_Expanded_Footer button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.Framework_Expanded_Error {
+    margin: 8px 0 0 0;
+    border: 1px solid #c86f6f;
+    background: #fff5f5;
+    color: #7c2525;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.Framework_Expanded_Content {
+    flex: 1;
+    min-height: 0;
+
+    border: 1px solid #111;
+    border-radius: 8px;
+    padding: 16px;
+
+    font-size: 13px;
+    line-height: 1.6;
+    color: #222;
+
+    outline: none;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    cursor: text;
+}
+
+.Framework_Expanded_Content:empty::before {
+    content: attr(data-placeholder);
+    color: #999;
+    pointer-events: none;
+}
+
+/* Medium laptop screens */
+@media (max-width: 1200px) {
+    .Canvas_Left_Open {
+        width: 260px;
+    }
+
+    .Canvas_Right_Open {
+        width: min(55vw, 600px);
+    }
+
+    .Canvas_Left {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+
+    .Canvas_Right {
+        padding: 18px;
+    }
+
+    .Canvas_Bottom_Toolbar {
+        bottom: 14px;
+    }
+
+    .Cabinet_File_Title {
+        font-size: 15px;
+    }
+
+    .Cabinet_File_Meta {
+        font-size: 12px;
+    }
+}
+
+/* Small laptops and tablets */
+@media (max-width: 900px) {
+    .Canvas_Left_Open {
+        width: min(82vw, 300px);
+    }
+
+    .Canvas_Right_Open {
+        width: min(92vw, 520px);
+    }
+
+    .Database_Button {
+        top: 16px;
+        left: 16px;
+        height: 42px;
+        padding: 0 16px;
+        font-size: 13px;
+    }
+
+    .Logout_Button {
+        top: 16px;
+        right: 16px;
+        max-width: 190px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .Canvas_Bottom_Toolbar {
+        max-width: calc(100% - 24px);
+        padding: 8px 12px;
+        flex-wrap: wrap;
+    }
+
+    .Note_Modal {
+        width: 96vw;
+        height: 92dvh;
+        border-radius: 16px;
+    }
+
+    .Note_Modal_Body {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+    }
+
+    .Note_Source_Column {
+        min-height: 40vh;
+        border-right: none;
+        border-bottom: 1.5px solid #b7b7b7;
+    }
+
+    .Note_User_Column {
+        min-height: 50vh;
+    }
+
+    .Framework_Expanded_Modal {
+        width: 96vw;
+        height: 92dvh;
+    }
+
+    .Framework_Expanded_Body {
+        grid-template-columns: 1fr;
+    }
+
+    .Framework_Expanded_Nav {
+        display: none;
+    }
+}
+
+/* =========================================================
+   Canvas Clusters
+   ========================================================= */
+
+   .Canvas_Cluster_Box {
+    position: absolute;
+
+    border: 2px dashed rgba(65, 65, 65, 0.4);
+    border-radius: 14px;
+
+    background:
+        rgba(220, 220, 220, 0.16);
+
+    box-shadow:
+        inset 0 0 0 1px
+        rgba(255, 255, 255, 0.55);
+
+    pointer-events: none;
+    user-select: none;
+
+    z-index: 0;
+
+    transition:
+        left 0.08s linear,
+        top 0.08s linear,
+        width 0.08s linear,
+        height 0.08s linear;
+}
+
+.Canvas_Cluster_Label {
+    position: absolute;
+
+    top: 10px;
+    left: 14px;
+
+    min-height: 22px;
+    padding: 4px 9px;
+
+    border: 1px solid
+        rgba(0, 0, 0, 0.12);
+
+    border-radius: 999px;
+
+    background:
+        rgba(255, 255, 255, 0.94);
+
+    color: #555;
+
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+
+    display: flex;
+    align-items: center;
+
+    box-shadow:
+        0 2px 6px
+        rgba(0, 0, 0, 0.08);
+}
+
+/* =========================================================
+   Fix scrolling inside opened Note modal
+   ========================================================= */
+
+/* Left: Source Text */
+.Note_Source_Column {
+    min-width: 0;
+    min-height: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+}
+
+.Note_Modal_Label {
+    flex-shrink: 0;
+}
+
+.Note_Source_Content {
+    flex: 1 1 0;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    padding-right: 6px;
+    overscroll-behavior: contain;
+}
+
+.Note_Source_Text {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow: visible;
+    overflow-wrap: anywhere;
+}
+
+
+/* Right: Note Editor */
+.Note_User_Column {
+    min-width: 0;
+    min-height: 0;
+
+    display: flex;
+
+    overflow: hidden;
+}
+
+.Note_Editor {
+    flex: 1 1 auto;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+}
+
+.Note_Editor_Header,
+.Note_Editor_Toolbar {
+    flex-shrink: 0;
+}
+
+.Note_Editor_Content {
+    flex: 1 1 0;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+
+/* Scrollbar appearance */
+.Note_Source_Content::-webkit-scrollbar,
+.Note_Editor_Content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.Note_Source_Content::-webkit-scrollbar-track,
+.Note_Editor_Content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.Note_Source_Content::-webkit-scrollbar-thumb,
+.Note_Editor_Content::-webkit-scrollbar-thumb {
+    background: #c7c7c7;
+    border-radius: 999px;
+}
+
+.Note_Source_Content::-webkit-scrollbar-thumb:hover,
+.Note_Editor_Content::-webkit-scrollbar-thumb:hover {
+    background: #999999;
 }

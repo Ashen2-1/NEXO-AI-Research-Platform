@@ -196,3 +196,30 @@
         flex-wrap: wrap;
     }
 }
+
+@media (max-width: 1200px) {
+    .Header_Inner {
+        padding: 10px 14px;
+    }
+
+    .Header_Tool_Row {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 5px;
+    }
+
+    .Header_Tool_Row::-webkit-scrollbar {
+        height: 4px;
+    }
+
+    .Header_Tool_Row::-webkit-scrollbar-thumb {
+        background: #cccccc;
+        border-radius: 999px;
+    }
+
+    .Header_Search_Box {
+        flex: 0 0 190px;
+        width: 190px;
+    }
+}

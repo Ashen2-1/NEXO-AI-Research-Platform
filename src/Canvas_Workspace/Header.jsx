@@ -22,6 +22,8 @@ function Header({
     onLockSelected,
     onPinTop,
 
+    sourceSearchQuery = "",
+
     onSearchSources,
     onAskOnly,
     onSummary,
@@ -103,12 +105,25 @@ function Header({
                         <>
                             <div className="Header_Search_Box">
                                 <span>⌕</span>
+
                                 <input
                                     type="text"
-                                    placeholder="Search sources or notes..."
+                                    value={sourceSearchQuery}
+                                    placeholder="Search title or abstract..."
+                                    onChange={(event) => {
+                                        onSearchSources?.(
+                                            event.currentTarget.value
+                                        );
+                                    }}
                                     onKeyDown={(event) => {
-                                        if (event.key === "Enter" && onSearchSources) {
-                                            onSearchSources(event.currentTarget.value);
+                                        if (event.key === "Escape") {
+                                            onSearchSources?.("");
+                                        }
+
+                                        if (event.key === "Enter") {
+                                            onSearchSources?.(
+                                                event.currentTarget.value
+                                            );
                                         }
                                     }}
                                 />

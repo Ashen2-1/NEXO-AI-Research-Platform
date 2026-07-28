@@ -4,17 +4,38 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get("/", authMiddleware, async (req,res) => {
+router.get("/", authMiddleware, async (req, res) => {
     try {
         const result = await pool.query(
-            `select id, title, body, user_note, x, y, source_type, source_name, file_url, file_size, chunks_added, db_total, created_at, updated_at from public.notes where user_id = $1 order by created_at asc`, [req.user.id]
+            `select
+                id,
+                title,
+                body,
+                user_note,
+                x,
+                y,
+                source_type,
+                source_name,
+                file_url,
+                file_size,
+                chunks_added,
+                db_total,
+                is_locked,
+                is_pinned,
+                created_at,
+                updated_at
+             from public.notes
+             where user_id = $1
+             order by created_at asc`,
+            [req.user.id]
         );
 
         res.json({
             notes: result.rows,
         });
-    }catch (error) {
+    } catch (error) {
         console.error("Get notes error:", error);
+
         res.status(500).json({
             error: "Server error while getting notes.",
         });
@@ -22,7 +43,22 @@ router.get("/", authMiddleware, async (req,res) => {
 });
 
 router.post("/", authMiddleware, async (req, res) => {
-    const {title, body, user_note, x, y, source_type, source_name, file_url, file_size, chunks_added, db_total,} = req.body;
+    const {
+        title,
+        body,
+        user_note,
+        x,
+        y,
+        source_type,
+        source_name,
+        file_url,
+        file_size,
+        chunks_added,
+        db_total,
+        is_locked = false,
+        is_pinned = false,
+        cluster_id = null,
+    } = req.body;
 
     if (!title) {
         return res.status(400).json({
@@ -32,27 +68,62 @@ router.post("/", authMiddleware, async (req, res) => {
 
     try {
         const result = await pool.query(
-            `insert into public.notes
-                (user_id, title, body, user_note, x, y, source_type, source_name, file_url, file_size, chunks_added, db_total)
-            values
-                ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            returning
-                id, title, body, user_note, x, y,
-                source_type, source_name, file_url, file_size, chunks_added, db_total,
-                created_at, updated_at`,
+            `insert into public.notes (
+                user_id,
+                title,
+                body,
+                user_note,
+                x,
+                y,
+                source_type,
+                source_name,
+                file_url,
+                file_size,
+                chunks_added,
+                db_total,
+                is_locked,
+                is_pinned,
+                cluster_id
+             )
+             values (
+                $1, $2, $3, $4, $5,
+                $6, $7, $8, $9, $10,
+                $11, $12, $13, $14, $15
+             )
+             returning
+                id,
+                title,
+                body,
+                user_note,
+                x,
+                y,
+                source_type,
+                source_name,
+                file_url,
+                file_size,
+                chunks_added,
+                db_total,
+                is_locked,
+                is_pinned,
+                cluster_id,
+                created_at,
+                updated_at`,
             [
                 req.user.id,
                 title,
-                body || "",
-                user_note || "",
+                body ?? "",
+                user_note ?? "",
                 x ?? 0,
                 y ?? 0,
                 source_type || "pdf",
                 source_name || title,
                 file_url || null,
-                file_size || null,
-                chunks_added || null,
-                db_total || null,
+                file_size ?? null,
+                chunks_added ?? null,
+                db_total ?? null,
+                Boolean(is_locked),
+                Boolean(is_pinned),
+                cluster_id || null,
             ]
         );
 
@@ -62,6 +133,7 @@ router.post("/", authMiddleware, async (req, res) => {
         });
     } catch (error) {
         console.error("Create note error:", error);
+
         res.status(500).json({
             error: "Server error while creating note.",
         });
@@ -70,7 +142,27 @@ router.post("/", authMiddleware, async (req, res) => {
 
 router.patch("/:id", authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { title, body, user_note, x, y } = req.body;
+
+    const {
+        title,
+        body,
+        user_note,
+        x,
+        y,
+        is_locked,
+        is_pinned,
+        cluster_id,
+    } = req.body;
+
+    const hasClusterId = Object.prototype.hasOwnProperty.call(
+        req.body,
+        "cluster_id"
+    );
+
+    const normalizedClusterId =
+        hasClusterId && cluster_id
+            ? String(cluster_id)
+            : null;
 
     try {
         const result = await pool.query(
@@ -81,18 +173,45 @@ router.patch("/:id", authMiddleware, async (req, res) => {
                 user_note = coalesce($3, user_note),
                 x = coalesce($4, x),
                 y = coalesce($5, y),
+                is_locked = coalesce($6, is_locked),
+                is_pinned = coalesce($7, is_pinned),
+
+                cluster_id = case
+                    when $8::boolean
+                    then $9::text
+                    else cluster_id
+                end,
+
                 updated_at = now()
-             where id = $6 and user_id = $7
+             where id = $10 and user_id = $11
              returning
-            id, title, body, user_note, x, y,
-            source_type, source_name, file_url, file_size, chunks_added, db_total,
-            created_at, updated_at`,
+                id,
+                title,
+                body,
+                user_note,
+                x,
+                y,
+                source_type,
+                source_name,
+                file_url,
+                file_size,
+                chunks_added,
+                db_total,
+                is_locked,
+                is_pinned,
+                cluster_id,
+                created_at,
+                updated_at`,
             [
                 title ?? null,
                 body ?? null,
                 user_note ?? null,
                 x ?? null,
                 y ?? null,
+                is_locked ?? null,
+                is_pinned ?? null,
+                hasClusterId,
+                normalizedClusterId,
                 id,
                 req.user.id,
             ]
@@ -110,6 +229,7 @@ router.patch("/:id", authMiddleware, async (req, res) => {
         });
     } catch (error) {
         console.error("Update note error:", error);
+
         res.status(500).json({
             error: "Server error while updating note.",
         });
