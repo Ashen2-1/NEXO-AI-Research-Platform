@@ -13,6 +13,11 @@ router.post("/register", async (req, res) => {
             error: "Email and Password are required."
         });
     }
+    if (password.length < 8) {
+        return res.status(400).json({
+            error: "Password must contain at least 8 characters.",
+        });
+    }
 
     try {
         const existingUser = await pool.query(

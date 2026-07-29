@@ -20,7 +20,7 @@
 
 .Login_Card {
     width: 480px;
-    min-height: 720px;
+    min-height: 580px;
 
     border: 1px solid #d8d8d8;
     border-radius: 20px;
@@ -195,5 +195,20 @@
 
 .Login_Continue_Button:disabled {
     opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.Login_Password_Hint {
+    margin: -14px 0 22px 0;
+    color: #777777;
+    font-size: 13px;
+}
+
+.Login_Signup_Text {
+    margin-top: 34px;
+}
+
+.Login_Signup_Text button:disabled {
+    opacity: 0.6;
     cursor: not-allowed;
 }
