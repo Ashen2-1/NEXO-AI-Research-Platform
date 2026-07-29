@@ -23,43 +23,83 @@ function UploadFile({ showModal, onClose, onUploadSuccess}) {
     }
   };
 
-  const closeModal = () => {
-    if (isUploading) {
+  const closeModal = (
+    forceClose = false
+  ) => {
+    if (
+      isUploading &&
+      !forceClose
+    ) {
       return;
     }
-
+  
     setClosing(true);
-
-    setTimeout(() => {
+  
+    window.setTimeout(() => {
       setClosing(false);
       clearFile();
-      onClose();
+      onClose?.();
     }, 200);
   };
 
-  const allowedTypes = [
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.ms-powerpoint",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  ];
+  const allowedExtensions =
+  new Set([
+    "pdf",
+    "doc",
+    "docx",
+    "xls",
+    "xlsx",
+    "ppt",
+    "pptx",
+  ]);
+
+const acceptedFileTypes =
+  ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx";
+
+const getFileExtension = (
+  selectedFile
+) => {
+  return (
+    selectedFile?.name
+      ?.split(".")
+      .pop()
+      ?.toLowerCase() || ""
+  );
+};
 
   const maxSize = 10 * 1024 * 1024;
 
-  const validateFile = (file) => {
-    if (!allowedTypes.includes(file.type)) {
-      alert("File type not allowed");
+  const validateFile = (
+    selectedFile
+  ) => {
+    const extension =
+      getFileExtension(
+        selectedFile
+      );
+  
+    if (
+      !allowedExtensions.has(
+        extension
+      )
+    ) {
+      alert(
+        "Supported files: PDF, DOC, DOCX, XLS, XLSX, PPT and PPTX."
+      );
+  
       return false;
     }
-
-    if (file.size > maxSize) {
-      alert("File must be under 10MB");
+  
+    if (
+      selectedFile.size >
+      maxSize
+    ) {
+      alert(
+        "File must be under 10MB."
+      );
+  
       return false;
     }
-
+  
     return true;
   };
 
@@ -145,29 +185,71 @@ function UploadFile({ showModal, onClose, onUploadSuccess}) {
       }
     };
 
-    xhr.onload = () => {
-      setIsUploading(false);
-
-      if (xhr.status >= 200 && xhr.status < 300) {
-        let responseData = null;
-
-        try {
-          responseData = JSON.parse(xhr.responseText);
-        } catch (error) {
-          console.error("Failed to parse upload response:", error);
-        }
-
-        console.log("Upload complete", responseData);
-
-        if (onUploadSuccess) {
-          onUploadSuccess(file, responseData);
-        }
-
-        closeModal();
-      } else {
-        console.error("Upload failed:", xhr.responseText);
-        alert(xhr.responseText || "Upload failed");
+    xhr.onload = async () => {
+      let responseData = {};
+    
+      try {
+        responseData =
+          JSON.parse(
+            xhr.responseText ||
+              "{}"
+          );
+      } catch (error) {
+        console.error(
+          "Failed to parse upload response:",
+          error
+        );
       }
+    
+      if (
+        xhr.status >= 200 &&
+        xhr.status < 300
+      ) {
+        setProgress(100);
+    
+        try {
+          await onUploadSuccess?.(
+            file,
+            responseData
+          );
+    
+          setIsUploading(false);
+    
+          /*
+            forceClose avoids the old
+            isUploading state closure.
+          */
+          closeModal(true);
+        } catch (error) {
+          console.error(
+            "Upload success callback failed:",
+            error
+          );
+    
+          setIsUploading(false);
+    
+          alert(
+            "The file uploaded, but the Canvas note could not be created."
+          );
+        }
+    
+        return;
+      }
+    
+      setIsUploading(false);
+      setProgress(0);
+    
+      console.error(
+        "Upload failed:",
+        responseData ||
+          xhr.responseText
+      );
+    
+      alert(
+        responseData?.error ||
+          xhr.responseText ||
+          "Upload failed."
+      );
     };
 
     xhr.onerror = () => {
@@ -243,16 +325,30 @@ function UploadFile({ showModal, onClose, onUploadSuccess}) {
               Cancel
             </button>
 
-            <button className="upload-done-btn" onClick={uploadToBackend} disabled={isUploading}>
-              Done
+            <button
+              type="button"
+              className="upload-done-btn"
+              onClick={uploadToBackend}
+              disabled={
+                isUploading || !file
+              }
+            >
+              {isUploading
+                ? "Uploading..."
+                : "Done"}
             </button>
           </div>
 
           <input
             type="file"
             ref={fileInputRef}
-            style={{ display: "none" }}
-            onChange={handleFileSelect}
+            accept={acceptedFileTypes}
+            style={{
+              display: "none",
+            }}
+            onChange={
+              handleFileSelect
+            }
           />
         </div>
       </div>

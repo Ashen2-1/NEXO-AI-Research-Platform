@@ -25,6 +25,91 @@ import { FaListOl } from "react-icons/fa";
 const FRAMEWORK_STORAGE_SOURCE = "__nexo_framework__";
 const OUTLINE_STORAGE_SOURCE = "__nexo_outline__";
 
+const getUploadedSourceType = (
+    fileName = "",
+    backendSourceType = ""
+) => {
+    const aliases = {
+        pdf: "pdf",
+
+        word: "word",
+        doc: "word",
+        docx: "word",
+
+        excel: "excel",
+        xls: "excel",
+        xlsx: "excel",
+
+        powerpoint:
+            "powerpoint",
+        ppt: "powerpoint",
+        pptx: "powerpoint",
+    };
+
+    const normalizedBackendType =
+        String(
+            backendSourceType || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    if (
+        aliases[
+            normalizedBackendType
+        ]
+    ) {
+        return aliases[
+            normalizedBackendType
+        ];
+    }
+
+    const extension =
+        String(fileName)
+            .split(".")
+            .pop()
+            ?.toLowerCase() || "";
+
+    return (
+        aliases[extension] ||
+        "document"
+    );
+};
+
+
+const getCanvasNoteTypeLabel = (
+    noteKind
+) => {
+    const labels = {
+        outline:
+            "Generated Outline",
+
+        framework:
+            "Framework",
+
+        pdf:
+            "PDF Source",
+
+        word:
+            "Word Source",
+
+        excel:
+            "Excel Source",
+
+        powerpoint:
+            "PowerPoint Source",
+
+        document:
+            "Document Source",
+        openalex:
+            "OpenAlex Source",
+    };
+
+    return (
+        labels[noteKind] ||
+        "Note"
+    );
+};
+
 function CanvasBoard(){
 
     const currentUser = JSON.parse(localStorage.getItem("nexo_user") || "null");
@@ -578,36 +663,172 @@ function CanvasBoard(){
     };
 
     /** When file upload success it will be package in the way we want so later can put into the PGSQL*/
-    const handleUploadSuccess = async (uploadedFile, uploadResult) => {
+    const handleUploadSuccess =
+    async (
+        uploadedFile,
+        uploadResult
+    ) => {
+        const sourceType =
+            getUploadedSourceType(
+                uploadedFile.name,
+                uploadResult
+                    ?.sourceType
+            );
+
+        const sourceDescription = {
+            pdf:
+                "PDF document",
+
+            word:
+                "Word document",
+
+            excel:
+                "Excel workbook",
+
+            powerpoint:
+                "PowerPoint presentation",
+
+            document:
+                "Document",
+        }[sourceType] ||
+        "Document";
+
+        /*
+          Different ingestion services
+          may return extracted text using
+          different property names.
+        */
+        const extractedText =
+            String(
+                uploadResult
+                    ?.summary ||
+                    uploadResult
+                        ?.extractedText ||
+                    uploadResult
+                        ?.extracted_text ||
+                    uploadResult?.text ||
+                    ""
+            ).trim();
+
+        const noteBody =
+            extractedText
+                ? extractedText.slice(
+                      0,
+                      10000
+                  )
+                : uploadResult
+                      ?.ingested
+                  ? `${sourceDescription} uploaded and indexed successfully.`
+                  : `${sourceDescription} uploaded successfully. Open the original file to view its contents.`;
+
         const newNoteData = {
-            title: uploadedFile.name,
-            body: `File name: ${uploadResult?.file || uploadedFile.name}`,
+            title:
+                uploadedFile.name,
+
+            body: noteBody,
+
             user_note: "",
-            x: 260 + notes.length * 35,
-            y: 120 + notes.length * 35,
-            source_type: "pdf",
-            source_name: uploadResult?.file || uploadedFile.name,
-            file_url: uploadResult?.fileUrl || "",
-            file_size: uploadResult?.fileSize || uploadedFile.size,
-            chunks_added: uploadResult?.chunks_added ?? null,
-            db_total: uploadResult?.db_total ?? null,
+
+            x:
+                260 +
+                notes.length *
+                    35,
+
+            y:
+                120 +
+                notes.length *
+                    35,
+
+            source_type:
+                sourceType,
+
+            source_name:
+                uploadResult
+                    ?.file ||
+                uploadResult
+                    ?.originalName ||
+                uploadedFile.name,
+
+            file_url:
+                uploadResult
+                    ?.fileUrl ||
+                "",
+
+            file_size:
+                uploadResult
+                    ?.fileSize ??
+                uploadedFile.size,
+
+            chunks_added:
+                uploadResult
+                    ?.chunks_added ??
+                uploadResult
+                    ?.chunksAdded ??
+                null,
+
+            db_total:
+                uploadResult
+                    ?.db_total ??
+                uploadResult
+                    ?.dbTotal ??
+                null,
         };
 
         try {
-            const data = await apiRequest("/notes", {
-                method: "POST",
-                body: JSON.stringify(newNoteData),
-            });
+            const data =
+                await apiRequest(
+                    "/notes",
+                    {
+                        method:
+                            "POST",
 
-            const newCanvasNote = convertDatabaseNoteToCanvasNote(data.note);
+                        body:
+                            JSON.stringify(
+                                newNoteData
+                            ),
+                    }
+                );
 
-            setNotes((prevNotes) => [...prevNotes, newCanvasNote]);
+            const newCanvasNote =
+                convertDatabaseNoteToCanvasNote(
+                    data.note
+                );
 
-            const newCabinetFile = convertNoteToCabinetFile(newCanvasNote);
-            setFiles((prevFiles) => [newCabinetFile, ...prevFiles]);
+            setNotes(
+                (prevNotes) => [
+                    ...prevNotes,
+                    newCanvasNote,
+                ]
+            );
+
+            const newCabinetFile =
+                convertNoteToCabinetFile(
+                    newCanvasNote
+                );
+
+            setFiles(
+                (prevFiles) => [
+                    newCabinetFile,
+                    ...prevFiles,
+                ]
+            );
+
+            if (
+                uploadResult?.warning
+            ) {
+                alert(
+                    `${sourceDescription} uploaded to the Canvas.\n\n${uploadResult.warning}`
+                );
+            }
         } catch (error) {
-            console.error("Create uploaded PDF note error:", error);
-            alert("PDF uploaded, but failed to create note on board.");
+            console.error(
+                "Create uploaded document note error:",
+                error
+            );
+
+            alert(
+                "The file uploaded, but the Canvas note could not be created."
+            );
         }
     };
     /***************************************************************************/
@@ -671,29 +892,130 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     /** This function will send a selected database document to the main board and save it to Supabase */
-    const handleSendDocToBoard = async (doc) => {
+    const handleSendDocToBoard =
+    async (doc) => {
+        const isOpenAlex =
+            doc.external_provider ===
+                "OpenAlex" ||
+            doc.source ===
+                "OpenAlex" ||
+            doc.is_external === true;
+
+        const sourceUrl =
+            doc.file_url ||
+            doc.source_url ||
+            "";
+
+        const before =
+            getSnapshot();
+
         const newNoteData = {
-            title: doc.title,
-            body: doc.description || "Note from database source.",
+            title:
+                doc.title ||
+                "Untitled Source",
+
+            body:
+                doc.description ||
+                "No abstract or preview text is available.",
+
             user_note: "",
-            x: 300 + notes.length * 30,
-            y: 120 + notes.length * 30,
+
+            x:
+                300 +
+                notes.length *
+                    30,
+
+            y:
+                120 +
+                notes.length *
+                    30,
+
+            source_type:
+                isOpenAlex
+                    ? "openalex"
+                    : doc.content_type ||
+                      "document",
+
+            source_name:
+                isOpenAlex
+                    ? doc.openalex_id ||
+                      doc.doi ||
+                      doc.id
+                    : doc.source ||
+                      doc.title,
+
+            file_url:
+                sourceUrl,
+
+            file_size:
+                null,
+
+            chunks_added:
+                null,
+
+            db_total:
+                null,
         };
 
         try {
-            const data = await apiRequest("/notes", {
-                method: "POST",
-                body: JSON.stringify(newNoteData),
-            });
+            const data =
+                await apiRequest(
+                    "/notes",
+                    {
+                        method:
+                            "POST",
 
-            const newCanvasNote = convertDatabaseNoteToCanvasNote(data.note);
+                        body:
+                            JSON.stringify(
+                                newNoteData
+                            ),
+                    }
+                );
 
-            setNotes((prevNotes) => [...prevNotes, newCanvasNote]);
+            const newCanvasNote =
+                convertDatabaseNoteToCanvasNote(
+                    data.note
+                );
+
+            setNotes(
+                (prevNotes) => [
+                    ...prevNotes,
+                    newCanvasNote,
+                ]
+            );
+
+            const newCabinetFile =
+                convertNoteToCabinetFile(
+                    newCanvasNote
+                );
+
+            setFiles(
+                (prevFiles) => [
+                    newCabinetFile,
+                    ...prevFiles,
+                ]
+            );
+
+            setUndoStack(
+                (stack) => [
+                    ...stack,
+                    before,
+                ]
+            );
+
+            setRedoStack([]);
         } catch (error) {
-            console.error("Create database note error:", error);
-            alert("Failed to send document to board.");
+            console.error(
+                "Create database note error:",
+                error
+            );
+
+            alert(
+                "Failed to send the source to the board."
+            );
         }
     };
+
     // const handleSendDocToBoard = async (doc) => {
     //     const x = 300 + notes.length * 30;
     //     const y = 120 + notes.length * 30;
@@ -831,8 +1153,17 @@ function CanvasBoard(){
             // });
 
             const selectedSourceNames = notes
-                .filter((note) => note.selected && note.sourceName)
-                .map((note) => note.sourceName);
+                .filter(
+                    (note) =>
+                        note.selected &&
+                        note.sourceName &&
+                        note.sourceType !==
+                            "openalex"
+                )
+                .map(
+                    (note) =>
+                        note.sourceName
+                );
 
             const uniqueSelectedSourceNames = [...new Set(selectedSourceNames)];
 
@@ -3613,7 +3944,10 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     </div>
                                 )}
 
-                                <p className="Canvas_Note_Title">
+                                <p
+                                    className="Canvas_Note_Title"
+                                    title={note.title}
+                                >
                                     {note.title}
                                 </p>
 
@@ -3624,11 +3958,9 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                 </p>
 
                                 <p className="Canvas_Note_Meta">
-                                    {note.noteKind === "outline"
-                                        ? "Generated Outline"
-                                        : note.noteKind === "pdf"
-                                        ? "PDF Source"
-                                        : "Note"}
+                                    {getCanvasNoteTypeLabel(
+                                        note.noteKind
+                                    )}
                                 </p>
 
                                 <div className="Canvas_Note_Dot"></div>
@@ -3640,9 +3972,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                 <p className="Note_Preview_Label">
                                     {hoveredNote.noteKind === "outline" ? "OUTLINE" : "PAPER"}
                                 </p>
-                                <h3>{hoveredNote.title}</h3>
+                                <h3 title={hoveredNote.title}>
+                                    {hoveredNote.title}
+                                </h3>
                                 <p className="Note_Preview_Label">ABSTRACT</p>
-                                <p className="Note_Preview_Text">
+                                <p
+                                    className="Note_Preview_Text"
+                                    title={stripHtml(hoveredNote.body || "")}
+                                >
                                     {stripHtml(hoveredNote.body || "").length > 200
                                         ? `${stripHtml(hoveredNote.body || "").slice(0, 199)}…`
                                         : stripHtml(hoveredNote.body || "") ||
@@ -3851,17 +4188,41 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                 <p className="Note_Modal_Label">SOURCE TEXT</p>
 
                                 <div className="Note_Source_Content">
-                                    {openedNote.sourceType === "pdf" && openedNote.fileUrl ? (
+                                    {openedNote.sourceType ===
+                                        "pdf" &&
+                                    openedNote.fileUrl ? (
                                         <div className="Note_PDF_Preview">
                                             <iframe
-                                                src={openedNote.fileUrl}
-                                                title={openedNote.title}
+                                                src={
+                                                    openedNote.fileUrl
+                                                }
+                                                title={
+                                                    openedNote.title
+                                                }
                                             />
                                         </div>
                                     ) : (
-                                        <p className="Note_Source_Text">
-                                            {openedNote?.body || "No source preview available."}
-                                        </p>
+                                        <div>
+                                            <p className="Note_Source_Text">
+                                                {openedNote.body ||
+                                                    "No source preview available."}
+                                            </p>
+
+                                            {openedNote.fileUrl && (
+                                                <a
+                                                    href={
+                                                        openedNote.fileUrl
+                                                    }
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    Open original{" "}
+                                                    {getCanvasNoteTypeLabel(
+                                                        openedNote.noteKind
+                                                    )}
+                                                </a>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
 
