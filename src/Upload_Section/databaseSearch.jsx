@@ -5,6 +5,31 @@ import { useEffect, useState } from "react";
 import { CiShare1 } from "react-icons/ci";
 import { apiRequest } from "../api";
 
+const createEmptyFilterState = () => ({
+    sources: [],
+    contentTypes: [],
+    languages: [],
+    accessTypes: [],
+    tags: [],
+});
+
+
+const OPENALEX_LANGUAGE_LABELS = {
+    en: "English",
+    zh: "Chinese",
+    fr: "French",
+    de: "German",
+    es: "Spanish",
+    it: "Italian",
+    pt: "Portuguese",
+    ar: "Arabic",
+    fa: "Persian",
+    ru: "Russian",
+    ja: "Japanese",
+    ko: "Korean",
+    tr: "Turkish",
+};
+
 function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
 
     const [docs, setDocs] = useState([]);
@@ -22,70 +47,57 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
 
     const [searchError, setSearchError] = useState("");
 
-    const [sourceOptions, setSourceOptions] = useState([]);
-    const [contentTypeOptions, setContentTypeOptions] = useState([]);
-    const [languageOptions, setLanguageOptions] = useState([]);
-    const [accessTypeOptions, setAccessTypeOptions] = useState([]);
-    const [tagOptions, setTagOptions] = useState([]);
-
-    const [selectedSources, setSelectedSources] = useState([
-    /*    
-        "JSTOR",
-        "Local Archive",
-        "Artstor",
-        "Artsy",
-        "Custom"
-    */
-    ]);
+    const [
+        localFilterOptions,
+        setLocalFilterOptions,
+    ] = useState(createEmptyFilterState);
     
-    const [selectedContentTypes, setSelectedContentTypes] = useState([
-    /*
-        "article",
-        "book_catalog",
-        "image_artwork",
-        "thesis_report"
-    */
-    ]);
+    const [
+        openAlexFilterOptions,
+        setOpenAlexFilterOptions,
+    ] = useState(createEmptyFilterState);
     
-    const [selectedLanguages, setSelectedLanguages] = useState([
-    /*
-        "English",
-        "Chinese",
-        "Other"
-    */
-    ]);
     
-    const [selectedAccessTypes, setSelectedAccessTypes] = useState([
-    /*
-        "full_text",
-        "abstract_only",
-        "open_access"
-    */
-    ]);
-
-    const [selectedTags, setSelectedTags] = useState([
-    /*
-        "photography",
-        "spectral",
-        "archive",
-        "gender",
-        "coloniality"
-    */
-    ]);
+    const [
+        selectedLocalFilters,
+        setSelectedLocalFilters,
+    ] = useState(createEmptyFilterState);
+    
+    const [
+        selectedOpenAlexFilters,
+        setSelectedOpenAlexFilters,
+    ] = useState(createEmptyFilterState);
 
     /***************************************************************************/
     /** This function loads all available filter options from the documents table */
-    async function fetchFilterOptions() {
+    async function fetchLocalFilterOptions() {
         try {
-            const data = await apiRequest("/documents/filters");
-
-            setSourceOptions(data.sources || []);
-            setContentTypeOptions(data.contentTypes || []);
-            setLanguageOptions(data.languages || []);
-            setAccessTypeOptions(data.accessTypes || []);
-            setTagOptions(data.tags || []);
+            const data =
+                await apiRequest(
+                    "/documents/filters"
+                );
+    
+            setLocalFilterOptions({
+                sources:
+                    data.sources || [],
+    
+                contentTypes:
+                    data.contentTypes || [],
+    
+                languages:
+                    data.languages || [],
+    
+                accessTypes:
+                    data.accessTypes || [],
+    
+                tags:
+                    data.tags || [],
+            });
         } catch (error) {
-            console.error("Failed to fetch filter options:", error);
+            console.error(
+                "Failed to fetch local filter options:",
+                error
+            );
         }
     }
 
@@ -93,9 +105,233 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
     /** This effect loads filter options from database when the popup opens */
     useEffect(() => {
         if (showModal) {
-            fetchFilterOptions();
+            fetchLocalFilterOptions();
         }
     }, [showModal]);
+
+    const getTopFilterValues = (
+        values,
+        limit = 30
+    ) => {
+        const counts = new Map();
+    
+        values
+            .filter(Boolean)
+            .map((value) =>
+                String(value).trim()
+            )
+            .filter(Boolean)
+            .forEach((value) => {
+                counts.set(
+                    value,
+                    (counts.get(value) || 0) + 1
+                );
+            });
+    
+        return [...counts.entries()]
+            .sort(
+                (
+                    [valueA, countA],
+                    [valueB, countB]
+                ) => {
+                    if (countB !== countA) {
+                        return countB - countA;
+                    }
+    
+                    return valueA.localeCompare(
+                        valueB
+                    );
+                }
+            )
+            .slice(0, limit)
+            .map(([value]) => value);
+    };
+    
+    
+    const getOpenAlexAccessValues = (
+        doc
+    ) => {
+        const values = new Set();
+    
+        if (doc.access_type) {
+            values.add(doc.access_type);
+        }
+    
+        if (
+            doc.access_type ===
+            "open_access"
+        ) {
+            values.add("open_access");
+        }
+    
+        if (doc.file_url) {
+            values.add("full_text");
+        }
+    
+        const description = String(
+            doc.description || ""
+        ).trim();
+    
+        if (
+            description &&
+            !description.startsWith(
+                "No abstract"
+            )
+        ) {
+            values.add("abstract_only");
+        }
+    
+        return [...values];
+    };
+    
+    
+    const buildOpenAlexFilterOptions = (
+        openAlexDocuments
+    ) => {
+        return {
+            /*
+              For OpenAlex, "Source" means the journal,
+              conference, repository or publishing platform.
+            */
+            sources: getTopFilterValues(
+                openAlexDocuments.map(
+                    (doc) =>
+                        doc.journal_or_platform ||
+                        doc.source
+                ),
+                25
+            ),
+    
+            contentTypes:
+                getTopFilterValues(
+                    openAlexDocuments.map(
+                        (doc) =>
+                            doc.content_type
+                    ),
+                    20
+                ),
+    
+            languages:
+                getTopFilterValues(
+                    openAlexDocuments.map(
+                        (doc) =>
+                            doc.language
+                    ),
+                    20
+                ),
+    
+            accessTypes:
+                getTopFilterValues(
+                    openAlexDocuments.flatMap(
+                        getOpenAlexAccessValues
+                    ),
+                    10
+                ),
+    
+            /*
+              OpenAlex tags come from the Topics attached
+              to the returned Works.
+            */
+            tags: getTopFilterValues(
+                openAlexDocuments.flatMap(
+                    (doc) =>
+                        Array.isArray(doc.tags)
+                            ? doc.tags
+                            : []
+                ),
+                30
+            ),
+        };
+    };
+
+    const matchesOneSelectedValue = (
+        selectedValues,
+        value
+    ) => {
+        return (
+            selectedValues.length === 0 ||
+            selectedValues.includes(value)
+        );
+    };
+    
+    
+    const filterOpenAlexDocuments = (
+        openAlexDocuments,
+        filters
+    ) => {
+        return openAlexDocuments.filter(
+            (doc) => {
+                const source =
+                    doc.journal_or_platform ||
+                    doc.source ||
+                    "";
+    
+                const contentType =
+                    doc.content_type || "";
+    
+                const language =
+                    doc.language || "";
+    
+                const docTags =
+                    Array.isArray(doc.tags)
+                        ? doc.tags
+                        : [];
+    
+                const docAccessValues =
+                    getOpenAlexAccessValues(doc);
+    
+                const sourceMatches =
+                    matchesOneSelectedValue(
+                        filters.sources,
+                        source
+                    );
+    
+                const contentTypeMatches =
+                    matchesOneSelectedValue(
+                        filters.contentTypes,
+                        contentType
+                    );
+    
+                const languageMatches =
+                    matchesOneSelectedValue(
+                        filters.languages,
+                        language
+                    );
+    
+                /*
+                  Multiple selected Access options use OR logic.
+                */
+                const accessMatches =
+                    filters.accessTypes.length ===
+                        0 ||
+                    filters.accessTypes.some(
+                        (value) =>
+                            docAccessValues.includes(
+                                value
+                            )
+                    );
+    
+                /*
+                  Match the Local Archive behavior:
+                  multiple Tags use OR / overlap logic.
+                */
+                const tagsMatch =
+                    filters.tags.length === 0 ||
+                    filters.tags.some(
+                        (tag) =>
+                            docTags.includes(tag)
+                    );
+    
+                return (
+                    sourceMatches &&
+                    contentTypeMatches &&
+                    languageMatches &&
+                    accessMatches &&
+                    tagsMatch
+                );
+            }
+        );
+    };
 
     async function fetchLocalDocuments(
         search
@@ -111,53 +347,62 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
         }
     
         if (
-            selectedSources.length > 0
+            selectedLocalFilters.sources
+                .length > 0
         ) {
             params.append(
                 "sources",
-                selectedSources.join(",")
+                selectedLocalFilters.sources.join(
+                    ","
+                )
             );
         }
     
         if (
-            selectedContentTypes.length >
-            0
+            selectedLocalFilters
+                .contentTypes.length > 0
         ) {
             params.append(
                 "contentTypes",
-                selectedContentTypes.join(
+                selectedLocalFilters.contentTypes.join(
                     ","
                 )
             );
         }
     
         if (
-            selectedLanguages.length > 0
+            selectedLocalFilters.languages
+                .length > 0
         ) {
             params.append(
                 "languages",
-                selectedLanguages.join(",")
-            );
-        }
-    
-        if (
-            selectedAccessTypes.length >
-            0
-        ) {
-            params.append(
-                "accessTypes",
-                selectedAccessTypes.join(
+                selectedLocalFilters.languages.join(
                     ","
                 )
             );
         }
     
         if (
-            selectedTags.length > 0
+            selectedLocalFilters
+                .accessTypes.length > 0
+        ) {
+            params.append(
+                "accessTypes",
+                selectedLocalFilters.accessTypes.join(
+                    ","
+                )
+            );
+        }
+    
+        if (
+            selectedLocalFilters.tags
+                .length > 0
         ) {
             params.append(
                 "tags",
-                selectedTags.join(",")
+                selectedLocalFilters.tags.join(
+                    ","
+                )
             );
         }
     
@@ -187,7 +432,6 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
         return data.documents || [];
     }
     
-    
     async function fetchOpenAlexDocuments(
         search
     ) {
@@ -197,6 +441,10 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
         if (
             normalizedSearch.length < 2
         ) {
+            setOpenAlexFilterOptions(
+                createEmptyFilterState()
+            );
+    
             return [];
         }
     
@@ -206,7 +454,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                     normalizedSearch,
     
                 perPage:
-                    "20",
+                    "50",
             });
     
         if (yearFrom.trim()) {
@@ -223,46 +471,42 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
             );
         }
     
-        if (
-            selectedContentTypes.length >
-            0
-        ) {
-            params.append(
-                "contentTypes",
-                selectedContentTypes.join(
-                    ","
-                )
-            );
-        }
-    
-        if (
-            selectedLanguages.length > 0
-        ) {
-            params.append(
-                "languages",
-                selectedLanguages.join(",")
-            );
-        }
-    
-        if (
-            selectedAccessTypes.length >
-            0
-        ) {
-            params.append(
-                "accessTypes",
-                selectedAccessTypes.join(
-                    ","
-                )
-            );
-        }
-    
         const data = await apiRequest(
             `/documents/openalex?${params.toString()}`
         );
     
-        return data.documents || [];
-    }
+        const rawOpenAlexDocuments =
+            Array.isArray(data.documents)
+                ? data.documents
+                : [];
     
+        /*
+          Generate the available Source, Type, Language,
+          Access and Topic options from the raw results.
+        */
+        const nextOptions =
+            buildOpenAlexFilterOptions(
+                rawOpenAlexDocuments
+            );
+    
+        setOpenAlexFilterOptions(
+            nextOptions
+        );
+    
+        /*
+          Only apply the currently selected filters.
+    
+          Important:
+          Do not call setSelectedOpenAlexFilters here.
+          That state is already watched by useEffect.
+          Updating it inside this request creates the
+          repeated select/unselect loop.
+        */
+        return filterOpenAlexDocuments(
+            rawOpenAlexDocuments,
+            selectedOpenAlexFilters
+        );
+    }
     
     function mergeUniqueDocuments(
         localDocuments,
@@ -290,7 +534,6 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
         });
     }
     
-    
     async function fetchDocuments(
         search = submittedSearchTerm,
         tab = activeTab
@@ -312,8 +555,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
     
             if (tab === "external") {
                 if (
-                    search.trim().length <
-                    2
+                    search.trim().length < 2
                 ) {
                     setDocs([]);
                     return;
@@ -333,41 +575,26 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
     
             /*
               ALL:
-              Local results are always loaded.
-              OpenAlex is queried only when a search
-              term has at least 2 characters.
+              Local filters affect Local documents only.
+              OpenAlex filters affect OpenAlex documents only.
             */
-            const localDocuments =
-                await fetchLocalDocuments(
-                    search
-                );
+            const localPromise =
+                fetchLocalDocuments(search);
     
-            let openAlexDocuments = [];
-    
-            if (
+            const openAlexPromise =
                 search.trim().length >= 2
-            ) {
-                try {
-                    openAlexDocuments =
-                        await fetchOpenAlexDocuments(
-                            search
-                        );
-                } catch (
-                    openAlexError
-                ) {
-                    console.error(
-                        "OpenAlex part of ALL search failed:",
-                        openAlexError
-                    );
+                    ? fetchOpenAlexDocuments(
+                          search
+                      )
+                    : Promise.resolve([]);
     
-                    setSearchError(
-                        `Local results loaded, but OpenAlex failed: ${
-                            openAlexError.message ||
-                            "Unknown error"
-                        }`
-                    );
-                }
-            }
+            const [
+                localDocuments,
+                openAlexDocuments,
+            ] = await Promise.all([
+                localPromise,
+                openAlexPromise,
+            ]);
     
             setDocs(
                 mergeUniqueDocuments(
@@ -385,17 +612,25 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
     
             setSearchError(
                 error.message ||
-                "Search failed."
+                    "Search failed."
             );
         } finally {
             setIsSearching(false);
         }
     }
     
-    
     const submitSearch = () => {
         const nextSearch =
             searchTerm.trim();
+    
+        if (
+            nextSearch !==
+            submittedSearchTerm
+        ) {
+            setSelectedOpenAlexFilters(
+                createEmptyFilterState()
+            );
+        }
     
         if (
             nextSearch ===
@@ -413,7 +648,6 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
             nextSearch
         );
     };
-    
     
     const changeSearchTab = (
         nextTab
@@ -436,7 +670,6 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
         }
     };
     
-    
     useEffect(() => {
         if (!showModal) {
             return;
@@ -450,11 +683,10 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
         showModal,
         activeTab,
         submittedSearchTerm,
-        selectedSources,
-        selectedContentTypes,
-        selectedLanguages,
-        selectedAccessTypes,
-        selectedTags,
+    
+        selectedLocalFilters,
+        selectedOpenAlexFilters,
+    
         yearFrom,
         yearTo,
     ]);
@@ -474,6 +706,218 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
             .replaceAll("_", " ")
             .replace(/\b\w/g, (char) => char.toUpperCase());
     }
+
+    function formatFilterLabel(
+        value,
+        filterKey
+    ) {
+        if (
+            filterKey === "languages" &&
+            OPENALEX_LANGUAGE_LABELS[value]
+        ) {
+            return OPENALEX_LANGUAGE_LABELS[
+                value
+            ];
+        }
+    
+        return String(value || "")
+            .replace(/[_-]+/g, " ")
+            .replace(
+                /\b\w/g,
+                (character) =>
+                    character.toUpperCase()
+            );
+    }
+    
+    
+    const toggleProviderFilter = (
+        provider,
+        filterKey,
+        value
+    ) => {
+        const setter =
+            provider === "local"
+                ? setSelectedLocalFilters
+                : setSelectedOpenAlexFilters;
+    
+        setter((previousFilters) => {
+            const currentValues =
+                previousFilters[filterKey];
+    
+            const nextValues =
+                currentValues.includes(value)
+                    ? currentValues.filter(
+                          (item) =>
+                              item !== value
+                      )
+                    : [
+                          ...currentValues,
+                          value,
+                      ];
+    
+            return {
+                ...previousFilters,
+                [filterKey]:
+                    nextValues,
+            };
+        });
+    };
+    
+    
+    const clearProviderFilters = (
+        provider
+    ) => {
+        if (provider === "local") {
+            setSelectedLocalFilters(
+                createEmptyFilterState()
+            );
+    
+            return;
+        }
+    
+        setSelectedOpenAlexFilters(
+            createEmptyFilterState()
+        );
+    };
+    
+    
+    const renderProviderFilterSection = (
+        provider,
+        filterKey,
+        label,
+        options,
+        selectedValues
+    ) => {
+        return (
+            <div className="database-filter-section">
+                <p className="filter-title">
+                    {label}
+                </p>
+    
+                <div className="filter-tags">
+                    {options.length > 0 ? (
+                        options.map((option) => (
+                            <button
+                                type="button"
+                                key={`${provider}-${filterKey}-${option}`}
+                                className={`filter-tag ${
+                                    selectedValues.includes(
+                                        option
+                                    )
+                                        ? "active"
+                                        : ""
+                                }`}
+                                onClick={() =>
+                                    toggleProviderFilter(
+                                        provider,
+                                        filterKey,
+                                        option
+                                    )
+                                }
+                            >
+                                {formatFilterLabel(
+                                    option,
+                                    filterKey
+                                )}
+                            </button>
+                        ))
+                    ) : (
+                        <span className="database-filter-empty">
+                            {provider ===
+                            "openalex"
+                                ? "Search OpenAlex to load options."
+                                : "No options available."}
+                        </span>
+                    )}
+                </div>
+            </div>
+        );
+    };
+    
+    
+    const renderProviderFilters = (
+        provider
+    ) => {
+        const isLocal =
+            provider === "local";
+    
+        const options = isLocal
+            ? localFilterOptions
+            : openAlexFilterOptions;
+    
+        const selected = isLocal
+            ? selectedLocalFilters
+            : selectedOpenAlexFilters;
+    
+        return (
+            <div
+                className={`database-provider-filter-group ${provider}`}
+            >
+                <div className="database-provider-filter-header">
+                    <h4>
+                        {isLocal
+                            ? "LOCAL ARCHIVE"
+                            : "OPENALEX"}
+                    </h4>
+    
+                    <button
+                        type="button"
+                        onClick={() =>
+                            clearProviderFilters(
+                                provider
+                            )
+                        }
+                    >
+                        Clear
+                    </button>
+                </div>
+    
+                {renderProviderFilterSection(
+                    provider,
+                    "sources",
+                    isLocal
+                        ? "Source"
+                        : "Source / Journal",
+                    options.sources,
+                    selected.sources
+                )}
+    
+                {renderProviderFilterSection(
+                    provider,
+                    "contentTypes",
+                    "Content type",
+                    options.contentTypes,
+                    selected.contentTypes
+                )}
+    
+                {renderProviderFilterSection(
+                    provider,
+                    "languages",
+                    "Language",
+                    options.languages,
+                    selected.languages
+                )}
+    
+                {renderProviderFilterSection(
+                    provider,
+                    "accessTypes",
+                    "Access",
+                    options.accessTypes,
+                    selected.accessTypes
+                )}
+    
+                {renderProviderFilterSection(
+                    provider,
+                    "tags",
+                    isLocal
+                        ? "Tags"
+                        : "Topics",
+                    options.tags,
+                    selected.tags
+                )}
+            </div>
+        );
+    };
 
     if (!showModal) {
         return null;
@@ -590,107 +1034,59 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                 <div className="database-content">
 
                     <aside className="database-filter-panel">
-
                         <h3>FILTERS</h3>
 
                         <div className="database-filter-section">
-                            <p className="filter-title">Source</p>
-
-                            <div className="filter-tags">
-                                {sourceOptions.map((source) => (
-                                    <button
-                                        key={source}
-                                        className={`filter-tag ${selectedSources.includes(source) ? "active" : ""}`}
-                                        onClick={() => toggleFilter(source, selectedSources, setSelectedSources)}
-                                    >
-                                        {formatLabel(source)}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="database-filter-section">
-                            <p className="filter-title">Content type</p>
-
-                            <div className="filter-tags">
-                                {contentTypeOptions.map((type) => (
-                                    <button
-                                        key={type}
-                                        className={`filter-tag ${selectedContentTypes.includes(type) ? "active" : ""}`}
-                                        onClick={() => toggleFilter(type, selectedContentTypes, setSelectedContentTypes)}
-                                    >
-                                        {formatLabel(type)}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="database-filter-section">
-                            <p className="filter-title">Year</p>
+                            <p className="filter-title">
+                                Year
+                            </p>
 
                             <div className="year-inputs">
                                 <input
+                                    type="number"
                                     placeholder="FROM"
                                     value={yearFrom}
-                                    onChange={(e) => setYearFrom(e.target.value)}
+                                    onChange={(event) =>
+                                        setYearFrom(
+                                            event.target.value
+                                        )
+                                    }
                                 />
 
                                 <input
+                                    type="number"
                                     placeholder="TO"
                                     value={yearTo}
-                                    onChange={(e) => setYearTo(e.target.value)}
+                                    onChange={(event) =>
+                                        setYearTo(
+                                            event.target.value
+                                        )
+                                    }
                                 />
                             </div>
                         </div>
 
-                        <div className="database-filter-section">
-                            <p className="filter-title">Language</p>
+                        {activeTab === "all" && (
+                            <>
+                                {renderProviderFilters(
+                                    "local"
+                                )}
 
-                            <div className="filter-tags">
-                                {languageOptions.map((language) => (
-                                    <button
-                                        key={language}
-                                        className={`filter-tag ${selectedLanguages.includes(language) ? "active" : ""}`}
-                                        onClick={() => toggleFilter(language, selectedLanguages, setSelectedLanguages)}
-                                    >
-                                        {formatLabel(language)}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                                {renderProviderFilters(
+                                    "openalex"
+                                )}
+                            </>
+                        )}
 
-                        <div className="database-filter-section">
-                            <p className="filter-title">Access</p>
+                        {activeTab === "local" &&
+                            renderProviderFilters(
+                                "local"
+                            )}
 
-                            <div className="filter-tags">
-                                {accessTypeOptions.map((access) => (
-                                    <button
-                                        key={access}
-                                        className={`filter-tag ${selectedAccessTypes.includes(access) ? "active" : ""}`}
-                                        onClick={() => toggleFilter(access, selectedAccessTypes, setSelectedAccessTypes)}
-                                    >
-                                        {formatLabel(access)}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="database-filter-section">
-                            <p className="filter-title">Tags</p>
-
-                            <div className="filter-tags">
-                                {tagOptions.map((tag) => (
-                                    <button
-                                        key={tag}
-                                        className={`filter-tag ${selectedTags.includes(tag) ? "active" : ""}`}
-                                        onClick={() => toggleFilter(tag, selectedTags, setSelectedTags)}
-                                    >
-                                        {formatLabel(tag)}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
+                        {activeTab === "external" &&
+                            renderProviderFilters(
+                                "openalex"
+                            )}
                     </aside>
 
                     <section className="database-results-panel">

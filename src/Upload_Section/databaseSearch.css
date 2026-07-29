@@ -838,3 +838,177 @@
     background: #222;
     color: white;
 }
+
+/* =========================================================
+   Provider-specific filters
+   ========================================================= */
+
+   .database-provider-filter-group {
+    margin-top: 22px;
+    padding: 16px;
+
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+
+    background: #fafafa;
+}
+
+.database-provider-filter-group.openalex {
+    background: #f7f8fa;
+}
+
+.database-provider-filter-header {
+    margin-bottom: 18px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.database-provider-filter-header h4 {
+    margin: 0;
+
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+
+    color: #444;
+}
+
+.database-provider-filter-header button {
+    border: none;
+    background: transparent;
+
+    padding: 2px 4px;
+
+    color: #888;
+    font-size: 10px;
+
+    cursor: pointer;
+}
+
+.database-provider-filter-header button:hover {
+    color: #111;
+    text-decoration: underline;
+}
+
+.database-provider-filter-group
+.database-filter-section:last-child {
+    margin-bottom: 0;
+}
+
+.database-filter-empty {
+    display: block;
+
+    color: #999;
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+
+/* Medium screens */
+@media (max-width: 1050px) {
+    .database-provider-filter-group {
+        grid-column: 1 / -1;
+
+        display: grid;
+        grid-template-columns:
+            repeat(
+                3,
+                minmax(150px, 1fr)
+            );
+
+        gap: 14px;
+    }
+
+    .database-provider-filter-header {
+        grid-column: 1 / -1;
+        margin-bottom: 0;
+    }
+
+    .database-provider-filter-group
+    .database-filter-section {
+        margin-bottom: 0;
+    }
+}
+
+
+/* Small screens */
+@media (max-width: 720px) {
+    .database-provider-filter-group {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+}
+
+
+@media (max-width: 460px) {
+    .database-provider-filter-group {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =========================================================
+   Make filter tags grow with long text
+   ========================================================= */
+
+.filter-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.database-filter-panel .filter-tag {
+    /* Remove the old fixed 28px height */
+    height: auto;
+    min-height: 28px;
+
+    /* Short text stays compact; long text uses available width */
+    width: fit-content;
+    max-width: 100%;
+
+    padding: 6px 12px;
+    box-sizing: border-box;
+
+    border: 1px solid rgba(0, 0, 0, 0.28);
+    border-radius: 999px;
+    background: white;
+
+    display: inline-flex;
+    align-items: center;
+
+    font-size: 11px;
+    line-height: 1.25;
+
+    justify-content: flex-start;
+    text-align: left;
+
+    /* Allow long journal names to wrap inside the button */
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+
+    cursor: pointer;
+    flex: 0 1 auto;
+
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.database-filter-panel .filter-tag:hover {
+    background-color: #7e7e7e;
+    color: white;
+}
+
+.database-filter-panel .filter-tag.active {
+    background: black;
+    color: white;
+    border-color: black;
+}
