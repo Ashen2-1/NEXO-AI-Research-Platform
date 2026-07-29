@@ -14,6 +14,14 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
     const [selectedDoc, setSelectedDoc] = useState(null);
     const [sentDocId, setSentDocId] = useState(null);
 
+    const [activeTab, setActiveTab] = useState("all");
+
+    const [submittedSearchTerm, setSubmittedSearchTerm] = useState("");
+
+    const [isSearching, setIsSearching] = useState(false);
+
+    const [searchError, setSearchError] = useState("");
+
     const [sourceOptions, setSourceOptions] = useState([]);
     const [contentTypeOptions, setContentTypeOptions] = useState([]);
     const [languageOptions, setLanguageOptions] = useState([]);
@@ -89,65 +97,366 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
         }
     }, [showModal]);
 
-    async function fetchDocuments(search = searchTerm) {
-        try {
-            const params = new URLSearchParams();
-
-            if (search.trim() !== "") {
-                params.append("search", search);
-            }
-
-            if (selectedSources.length > 0) {
-                params.append("sources", selectedSources.join(","));
-            }
-
-            if (selectedContentTypes.length > 0) {
-                params.append("contentTypes", selectedContentTypes.join(","));
-            }
-
-            if (selectedLanguages.length > 0) {
-                params.append("languages", selectedLanguages.join(","));
-            }
-
-            if (selectedAccessTypes.length > 0) {
-                params.append("accessTypes", selectedAccessTypes.join(","));
-            }
-
-            if (selectedTags.length > 0) {
-                params.append("tags", selectedTags.join(","));
-            }
-
-            if (yearFrom.trim() !== "") {
-                params.append("yearFrom", yearFrom);
-            }
-
-            if (yearTo.trim() !== "") {
-                params.append("yearTo", yearTo);
-            }
-
-            const queryString = params.toString();
-
-            const data = await apiRequest(
-                queryString ? `/documents?${queryString}` : "/documents"
+    async function fetchLocalDocuments(
+        search
+    ) {
+        const params =
+            new URLSearchParams();
+    
+        if (search.trim()) {
+            params.append(
+                "search",
+                search.trim()
             );
-
-            setDocs(data.documents || []);
+        }
+    
+        if (
+            selectedSources.length > 0
+        ) {
+            params.append(
+                "sources",
+                selectedSources.join(",")
+            );
+        }
+    
+        if (
+            selectedContentTypes.length >
+            0
+        ) {
+            params.append(
+                "contentTypes",
+                selectedContentTypes.join(
+                    ","
+                )
+            );
+        }
+    
+        if (
+            selectedLanguages.length > 0
+        ) {
+            params.append(
+                "languages",
+                selectedLanguages.join(",")
+            );
+        }
+    
+        if (
+            selectedAccessTypes.length >
+            0
+        ) {
+            params.append(
+                "accessTypes",
+                selectedAccessTypes.join(
+                    ","
+                )
+            );
+        }
+    
+        if (
+            selectedTags.length > 0
+        ) {
+            params.append(
+                "tags",
+                selectedTags.join(",")
+            );
+        }
+    
+        if (yearFrom.trim()) {
+            params.append(
+                "yearFrom",
+                yearFrom.trim()
+            );
+        }
+    
+        if (yearTo.trim()) {
+            params.append(
+                "yearTo",
+                yearTo.trim()
+            );
+        }
+    
+        const queryString =
+            params.toString();
+    
+        const data = await apiRequest(
+            queryString
+                ? `/documents?${queryString}`
+                : "/documents"
+        );
+    
+        return data.documents || [];
+    }
+    
+    
+    async function fetchOpenAlexDocuments(
+        search
+    ) {
+        const normalizedSearch =
+            search.trim();
+    
+        if (
+            normalizedSearch.length < 2
+        ) {
+            return [];
+        }
+    
+        const params =
+            new URLSearchParams({
+                search:
+                    normalizedSearch,
+    
+                perPage:
+                    "20",
+            });
+    
+        if (yearFrom.trim()) {
+            params.append(
+                "yearFrom",
+                yearFrom.trim()
+            );
+        }
+    
+        if (yearTo.trim()) {
+            params.append(
+                "yearTo",
+                yearTo.trim()
+            );
+        }
+    
+        if (
+            selectedContentTypes.length >
+            0
+        ) {
+            params.append(
+                "contentTypes",
+                selectedContentTypes.join(
+                    ","
+                )
+            );
+        }
+    
+        if (
+            selectedLanguages.length > 0
+        ) {
+            params.append(
+                "languages",
+                selectedLanguages.join(",")
+            );
+        }
+    
+        if (
+            selectedAccessTypes.length >
+            0
+        ) {
+            params.append(
+                "accessTypes",
+                selectedAccessTypes.join(
+                    ","
+                )
+            );
+        }
+    
+        const data = await apiRequest(
+            `/documents/openalex?${params.toString()}`
+        );
+    
+        return data.documents || [];
+    }
+    
+    
+    function mergeUniqueDocuments(
+        localDocuments,
+        openAlexDocuments
+    ) {
+        const seen = new Set();
+    
+        return [
+            ...localDocuments,
+            ...openAlexDocuments,
+        ].filter((doc) => {
+            const key = String(
+                doc.doi ||
+                doc.openalex_id ||
+                doc.id ||
+                `${doc.title}-${doc.publication_year}`
+            ).toLowerCase();
+    
+            if (seen.has(key)) {
+                return false;
+            }
+    
+            seen.add(key);
+            return true;
+        });
+    }
+    
+    
+    async function fetchDocuments(
+        search = submittedSearchTerm,
+        tab = activeTab
+    ) {
+        setIsSearching(true);
+        setSearchError("");
+        setSelectedDoc(null);
+    
+        try {
+            if (tab === "local") {
+                const localDocuments =
+                    await fetchLocalDocuments(
+                        search
+                    );
+    
+                setDocs(localDocuments);
+                return;
+            }
+    
+            if (tab === "external") {
+                if (
+                    search.trim().length <
+                    2
+                ) {
+                    setDocs([]);
+                    return;
+                }
+    
+                const openAlexDocuments =
+                    await fetchOpenAlexDocuments(
+                        search
+                    );
+    
+                setDocs(
+                    openAlexDocuments
+                );
+    
+                return;
+            }
+    
+            /*
+              ALL:
+              Local results are always loaded.
+              OpenAlex is queried only when a search
+              term has at least 2 characters.
+            */
+            const localDocuments =
+                await fetchLocalDocuments(
+                    search
+                );
+    
+            let openAlexDocuments = [];
+    
+            if (
+                search.trim().length >= 2
+            ) {
+                try {
+                    openAlexDocuments =
+                        await fetchOpenAlexDocuments(
+                            search
+                        );
+                } catch (
+                    openAlexError
+                ) {
+                    console.error(
+                        "OpenAlex part of ALL search failed:",
+                        openAlexError
+                    );
+    
+                    setSearchError(
+                        `Local results loaded, but OpenAlex failed: ${
+                            openAlexError.message ||
+                            "Unknown error"
+                        }`
+                    );
+                }
+            }
+    
+            setDocs(
+                mergeUniqueDocuments(
+                    localDocuments,
+                    openAlexDocuments
+                )
+            );
         } catch (error) {
-            console.error("Failed to fetch documents:", error);
+            console.error(
+                "Failed to fetch documents:",
+                error
+            );
+    
+            setDocs([]);
+    
+            setSearchError(
+                error.message ||
+                "Search failed."
+            );
+        } finally {
+            setIsSearching(false);
         }
     }
-
+    
+    
+    const submitSearch = () => {
+        const nextSearch =
+            searchTerm.trim();
+    
+        if (
+            nextSearch ===
+            submittedSearchTerm
+        ) {
+            fetchDocuments(
+                nextSearch,
+                activeTab
+            );
+    
+            return;
+        }
+    
+        setSubmittedSearchTerm(
+            nextSearch
+        );
+    };
+    
+    
+    const changeSearchTab = (
+        nextTab
+    ) => {
+        setActiveTab(nextTab);
+        setSelectedDoc(null);
+        setSearchError("");
+    
+        /*
+          When switching to OpenAlex or ALL,
+          use the current input as the submitted query.
+        */
+        if (
+            nextTab !== "local" &&
+            searchTerm.trim()
+        ) {
+            setSubmittedSearchTerm(
+                searchTerm.trim()
+            );
+        }
+    };
+    
+    
     useEffect(() => {
-        fetchDocuments();
+        if (!showModal) {
+            return;
+        }
+    
+        fetchDocuments(
+            submittedSearchTerm,
+            activeTab
+        );
     }, [
-        searchTerm,
+        showModal,
+        activeTab,
+        submittedSearchTerm,
         selectedSources,
         selectedContentTypes,
         selectedLanguages,
         selectedAccessTypes,
         selectedTags,
         yearFrom,
-        yearTo
+        yearTo,
     ]);
 
     function toggleFilter(value, selectedList, setSelectedList) {
@@ -176,30 +485,94 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
 
                 <div className="database-topbar">
 
-                    <div className="database-tabs">
-                        <button className="database-tab active">
-                            ALL
-                        </button>
+                <div className="database-tabs">
+                    <button
+                        type="button"
+                        className={`database-tab ${
+                            activeTab === "all"
+                                ? "active"
+                                : ""
+                        }`}
+                        onClick={() =>
+                            changeSearchTab("all")
+                        }
+                    >
+                        ALL
+                    </button>
 
-                        <button className="database-tab">
-                            LOCAL ARCHIVE
-                        </button>
+                    <button
+                        type="button"
+                        className={`database-tab ${
+                            activeTab === "local"
+                                ? "active"
+                                : ""
+                        }`}
+                        onClick={() =>
+                            changeSearchTab("local")
+                        }
+                    >
+                        LOCAL ARCHIVE
+                    </button>
 
-                        <button className="database-tab">
-                            EXTERNAL DATABASES
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        className={`database-tab ${
+                            activeTab === "external"
+                                ? "active"
+                                : ""
+                        }`}
+                        onClick={() =>
+                            changeSearchTab(
+                                "external"
+                            )
+                        }
+                    >
+                        OPENALEX
+                    </button>
+                </div>
 
                     <div className="database-topbar-right">
 
                         <div className="database-searchbar">
-                            <FiSearch className="database-search-icon" />
+                            <button
+                                type="button"
+                                className="database-search-submit"
+                                onClick={submitSearch}
+                                aria-label="Search"
+                                title="Search"
+                            >
+                                <FiSearch className="database-search-icon" />
+                            </button>
 
                             <input
                                 type="text"
-                                placeholder="Search articles, books, images..."
+                                placeholder={
+                                    activeTab === "external"
+                                        ? "Search OpenAlex papers..."
+                                        : "Search articles, books, images..."
+                                }
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={(event) =>
+                                    setSearchTerm(
+                                        event.target.value
+                                    )
+                                }
+                                onKeyDown={(event) => {
+                                    if (
+                                        event.key === "Enter"
+                                    ) {
+                                        submitSearch();
+                                    }
+
+                                    if (
+                                        event.key === "Escape"
+                                    ) {
+                                        setSearchTerm("");
+                                        setSubmittedSearchTerm(
+                                            ""
+                                        );
+                                    }
+                                }}
                             />
                         </div>
 
@@ -322,10 +695,41 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
 
                     <section className="database-results-panel">
                         <div className="database-results-header">
-                            {docs.length} results • Sorted by relevance
+                            {isSearching
+                                ? "Searching..."
+                                : `${docs.length} result${
+                                    docs.length === 1
+                                        ? ""
+                                        : "s"
+                                } • ${
+                                    activeTab === "external"
+                                        ? "OpenAlex"
+                                        : activeTab === "local"
+                                            ? "Local Archive"
+                                            : "Local + OpenAlex"
+                                }`}
                         </div>
 
                         <div className="database-results-scroll">
+                            {searchError && (
+                                <div className="database-search-state error">
+                                    {searchError}
+                                </div>
+                            )}
+
+                            {!isSearching &&
+                            !searchError &&
+                            docs.length === 0 && (
+                                <div className="database-search-state">
+                                    {activeTab ===
+                                        "external" &&
+                                    submittedSearchTerm.length <
+                                        2
+                                        ? "Enter at least 2 characters and press Enter to search OpenAlex."
+                                        : "No results found."}
+                                </div>
+                            )}
+
                             {docs.map((doc, index) => (
                                 <div
                                 className={`database-result-card ${
@@ -337,13 +741,15 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                                     <h2>{doc.title}</h2>
 
                                     <p className="database-meta">
-                                        {doc.authors} •
-                                        {" "}
-                                        {doc.journal_or_platform} •
-                                        {" "}
-                                        {doc.publication_year} •
-                                        {" "}
-                                        {doc.source}
+                                        {[
+                                            doc.authors,
+                                            doc.journal_or_platform,
+                                            doc.publication_year,
+                                            doc.source,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" • ") ||
+                                            "No publication metadata"}
                                     </p>
 
                                     <p className="database-description">
@@ -380,15 +786,24 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                                         >
                                             {sentDocId === doc.id ? "Added ✓" : "Send to Board"}
                                         </button>
-                                        <a 
-                                            href={doc.source_url} 
-                                            className="database-open-source"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                        >
-                                            <CiShare1 />
-                                            Open source
-                                        </a>
+                                        {(doc.source_url ||
+                                        doc.file_url) && (
+                                            <a
+                                                href={
+                                                    doc.source_url ||
+                                                    doc.file_url
+                                                }
+                                                className="database-open-source"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={(event) =>
+                                                    event.stopPropagation()
+                                                }
+                                            >
+                                                <CiShare1 />
+                                                Open source
+                                            </a>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -413,11 +828,90 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                                     </p>
                                 </div>
 
-                                <iframe
-                                    src={selectedDoc.file_url || selectedDoc.source_url}
-                                    title={selectedDoc.title}
-                                    className="document-preview"
-                                />
+                                {selectedDoc.is_external ? (
+                                    <div className="openalex-preview">
+                                        <p className="openalex-preview-label">
+                                            ABSTRACT
+                                        </p>
+
+                                        <p className="openalex-preview-abstract">
+                                            {selectedDoc.description ||
+                                                "No abstract is available."}
+                                        </p>
+
+                                        <div className="openalex-preview-meta">
+                                            {selectedDoc.doi && (
+                                                <p>
+                                                    <strong>DOI:</strong>{" "}
+                                                    {selectedDoc.doi}
+                                                </p>
+                                            )}
+
+                                            <p>
+                                                <strong>Citations:</strong>{" "}
+                                                {selectedDoc.cited_by_count ??
+                                                    0}
+                                            </p>
+
+                                            <p>
+                                                <strong>Access:</strong>{" "}
+                                                {selectedDoc.access_type ===
+                                                "open_access"
+                                                    ? `Open access${
+                                                        selectedDoc.oa_status
+                                                            ? ` · ${selectedDoc.oa_status}`
+                                                            : ""
+                                                    }`
+                                                    : "Metadata only"}
+                                            </p>
+
+                                            {selectedDoc.language && (
+                                                <p>
+                                                    <strong>Language:</strong>{" "}
+                                                    {selectedDoc.language}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="openalex-preview-actions">
+                                            {selectedDoc.source_url && (
+                                                <a
+                                                    href={
+                                                        selectedDoc.source_url
+                                                    }
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    <CiShare1 />
+                                                    Open publication
+                                                </a>
+                                            )}
+
+                                            {selectedDoc.file_url && (
+                                                <a
+                                                    href={
+                                                        selectedDoc.file_url
+                                                    }
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    Open PDF
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <iframe
+                                        src={
+                                            selectedDoc.file_url ||
+                                            selectedDoc.source_url
+                                        }
+                                        title={
+                                            selectedDoc.title
+                                        }
+                                        className="document-preview"
+                                    />
+                                )}
 
                             </div>
 

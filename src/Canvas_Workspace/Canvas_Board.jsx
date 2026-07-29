@@ -100,6 +100,8 @@ const getCanvasNoteTypeLabel = (
 
         document:
             "Document Source",
+        openalex:
+            "OpenAlex Source",
     };
 
     return (
@@ -890,29 +892,130 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     /** This function will send a selected database document to the main board and save it to Supabase */
-    const handleSendDocToBoard = async (doc) => {
+    const handleSendDocToBoard =
+    async (doc) => {
+        const isOpenAlex =
+            doc.external_provider ===
+                "OpenAlex" ||
+            doc.source ===
+                "OpenAlex" ||
+            doc.is_external === true;
+
+        const sourceUrl =
+            doc.file_url ||
+            doc.source_url ||
+            "";
+
+        const before =
+            getSnapshot();
+
         const newNoteData = {
-            title: doc.title,
-            body: doc.description || "Note from database source.",
+            title:
+                doc.title ||
+                "Untitled Source",
+
+            body:
+                doc.description ||
+                "No abstract or preview text is available.",
+
             user_note: "",
-            x: 300 + notes.length * 30,
-            y: 120 + notes.length * 30,
+
+            x:
+                300 +
+                notes.length *
+                    30,
+
+            y:
+                120 +
+                notes.length *
+                    30,
+
+            source_type:
+                isOpenAlex
+                    ? "openalex"
+                    : doc.content_type ||
+                      "document",
+
+            source_name:
+                isOpenAlex
+                    ? doc.openalex_id ||
+                      doc.doi ||
+                      doc.id
+                    : doc.source ||
+                      doc.title,
+
+            file_url:
+                sourceUrl,
+
+            file_size:
+                null,
+
+            chunks_added:
+                null,
+
+            db_total:
+                null,
         };
 
         try {
-            const data = await apiRequest("/notes", {
-                method: "POST",
-                body: JSON.stringify(newNoteData),
-            });
+            const data =
+                await apiRequest(
+                    "/notes",
+                    {
+                        method:
+                            "POST",
 
-            const newCanvasNote = convertDatabaseNoteToCanvasNote(data.note);
+                        body:
+                            JSON.stringify(
+                                newNoteData
+                            ),
+                    }
+                );
 
-            setNotes((prevNotes) => [...prevNotes, newCanvasNote]);
+            const newCanvasNote =
+                convertDatabaseNoteToCanvasNote(
+                    data.note
+                );
+
+            setNotes(
+                (prevNotes) => [
+                    ...prevNotes,
+                    newCanvasNote,
+                ]
+            );
+
+            const newCabinetFile =
+                convertNoteToCabinetFile(
+                    newCanvasNote
+                );
+
+            setFiles(
+                (prevFiles) => [
+                    newCabinetFile,
+                    ...prevFiles,
+                ]
+            );
+
+            setUndoStack(
+                (stack) => [
+                    ...stack,
+                    before,
+                ]
+            );
+
+            setRedoStack([]);
         } catch (error) {
-            console.error("Create database note error:", error);
-            alert("Failed to send document to board.");
+            console.error(
+                "Create database note error:",
+                error
+            );
+
+            alert(
+                "Failed to send the source to the board."
+            );
         }
     };
+
     // const handleSendDocToBoard = async (doc) => {
     //     const x = 300 + notes.length * 30;
     //     const y = 120 + notes.length * 30;
@@ -1050,8 +1153,17 @@ function CanvasBoard(){
             // });
 
             const selectedSourceNames = notes
-                .filter((note) => note.selected && note.sourceName)
-                .map((note) => note.sourceName);
+                .filter(
+                    (note) =>
+                        note.selected &&
+                        note.sourceName &&
+                        note.sourceType !==
+                            "openalex"
+                )
+                .map(
+                    (note) =>
+                        note.sourceName
+                );
 
             const uniqueSelectedSourceNames = [...new Set(selectedSourceNames)];
 
