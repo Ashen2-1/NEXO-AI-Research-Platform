@@ -234,10 +234,7 @@ router.get(
             });
         }
 
-        const apiKey = String(
-            process.env
-                .OPENALEX_API_KEY || ""
-        ).trim();
+        const apiKey = String(process.env.OPENALEX_API_KEY || "").trim();
 
         if (!apiKey) {
             return res.status(503).json({

@@ -3160,6 +3160,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
             user_note: "",
             x: 320 + notes.length * 25,
             y: 140 + notes.length * 25,
+            source_type: "note",
         };
 
         const before = getSnapshot();
