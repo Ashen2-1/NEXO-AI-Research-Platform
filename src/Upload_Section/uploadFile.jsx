@@ -241,17 +241,20 @@ const getFileExtension = (
       setIsUploading(false);
       setProgress(0);
     
-      console.error(
-        "Upload failed:",
-        responseData ||
-          xhr.responseText
-      );
-    
-      alert(
-        responseData?.error ||
-          xhr.responseText ||
-          "Upload failed."
-      );
+      console.error("Upload failed:", xhr.status, xhr.responseText);
+
+      let message = "Upload failed";
+
+      try {
+        const errorData = JSON.parse(xhr.responseText);
+        message = errorData.error || errorData.detail || message;
+      } catch {
+        if (xhr.responseText) {
+          message = xhr.responseText;
+        }
+      }
+
+      alert(message);
     };
 
     xhr.onerror = () => {
