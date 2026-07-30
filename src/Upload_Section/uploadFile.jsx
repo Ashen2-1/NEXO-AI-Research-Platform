@@ -1,5 +1,7 @@
 import { useState, useRef } from "react";
+import { buildApiUrl } from "../api.js";
 import "./uploadFile.css";
+
 
 function UploadFile({ showModal, onClose, onUploadSuccess}) {
   const [dragging, setDragging] = useState(false);
@@ -170,7 +172,7 @@ const getFileExtension = (
 
     const xhr = new XMLHttpRequest();
 
-    xhr.open("POST", "http://localhost:5000/api/files/ingest");
+    xhr.open("POST", buildApiUrl("/files/ingest"));
 
     const token = localStorage.getItem("nexo_token");
 
