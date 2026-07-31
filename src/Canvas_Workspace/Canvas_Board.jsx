@@ -2978,78 +2978,85 @@ ${frameworkEditorDraft.slice(0, 60000)}
     };
 
     const handleConvertFrameworkToOutline = async () => {
-        const frameworkText =
-            stripHtml(frameworkEditorDraft).trim() ||
-            stripHtml(currentFramework?.content || "").trim();
-    
+        const rawFramework =
+            frameworkEditorDraft ||
+            currentFramework?.content ||
+            "";
+
+        const frameworkText = stripHtml(
+            String(rawFramework)
+                .replace(/<br\s*\/?>/gi, "\n")
+                .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+        ).trim();
+
         if (!frameworkText) {
             alert("There is no Framework content to convert.");
             return;
         }
 
         setIsConvertingOutline(true);
-    
+        setFrameworkGenerationError("");
+
         const outlineTitle = `Outline - ${
             currentFramework?.title || "Framework"
         }`;
-    
-        const outlineText = `
-    OUTLINE
-    
-    I. INTRODUCTION
-    - Research topic: ${frameworkDirection || "Topic derived from the Framework"}
-    - Background and research context
-    - Research question
-    - Working thesis or argument
-    
-    II. KEY CONCEPTS AND THEORETICAL CONTEXT
-    - Define the main concepts
-    - Explain the relevant theoretical framework
-    - Establish the terms used in the research
-    
-    III. MAIN ARGUMENTS AND EVIDENCE
-    ${frameworkText}
-    
-    IV. SOURCE RELATIONSHIPS
-    - Explain how the selected sources support one another
-    - Identify agreements, tensions, and contradictions
-    - Connect evidence to each major claim
-    
-    V. RESEARCH GAPS
-    - Identify missing evidence
-    - Note unresolved questions
-    - List areas requiring further research
-    
-    VI. ORIGINAL CONTRIBUTION
-    - State the new interpretation or contribution
-    - Explain how the argument extends existing research
-    
-    VII. CONCLUSION
-    - Restate the central argument
-    - Summarize the strongest evidence
-    - Explain the significance of the research
-        `.trim();
-    
-        // The note editor stores editable content as HTML.
-        const escapeHtml = (value) =>
-            value
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;");
-    
-        const outlineHtml = escapeHtml(outlineText).replace(/\n/g, "<br>");
-    
-        // Put the new card in the currently visible part of the Canvas,
-        // instead of the hidden default position x=0, y=0.
-        const stagger = (notes.length % 5) * 24;
-    
-        const outlineX =
-            (380 - boardOffset.x) / boardScale + stagger;
-    
-        const outlineY =
-            (150 - boardOffset.y) / boardScale + stagger;
-    
+
         try {
+            const prompt = `
+    Convert the research framework below into a concise, academically useful research outline.
+
+    Requirements:
+    1. Preserve the actual research question, claims, evidence, source relationships, research gaps, and contribution.
+    2. Do not copy the complete framework into one section.
+    3. Organize information under appropriate outline sections.
+    4. Use Roman numerals for main sections.
+    5. Use capital letters for subsections.
+    6. Use short bullet points for supporting details.
+    7. Keep source filenames or citations beside the claims they support.
+    8. Do not invent evidence.
+    9. Do not use Markdown heading symbols such as # or ##.
+    10. Return only the finished outline.
+
+    RESEARCH FRAMEWORK:
+
+    ${frameworkText.slice(0, 50000)}
+            `.trim();
+
+            const aiResult = await requestAiText({
+                question: prompt,
+                useRag: false,
+                topK: 5,
+            });
+
+            const outlineText = String(aiResult.answer || "")
+                .replace(/^#{1,6}\s*/gm, "")
+                .replace(/\*\*(.*?)\*\*/g, "$1")
+                .replace(/^\s*\*\s+/gm, "- ")
+                .trim();
+
+            if (!outlineText) {
+                throw new Error(
+                    "The AI service returned an empty outline."
+                );
+            }
+
+            const escapeHtml = (value) =>
+                value
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;");
+
+            const outlineHtml = escapeHtml(outlineText)
+                .replace(/\n/g, "<br>");
+
+            const stagger = (notes.length % 5) * 24;
+
+            const outlineX =
+                (380 - boardOffset.x) / boardScale + stagger;
+
+            const outlineY =
+                (150 - boardOffset.y) / boardScale + stagger;
+
             const data = await apiRequest("/notes", {
                 method: "POST",
                 body: JSON.stringify({
@@ -3058,42 +3065,41 @@ ${frameworkEditorDraft.slice(0, 60000)}
                     user_note: outlineHtml,
                     x: outlineX,
                     y: outlineY,
-    
-                    // Keep an already-supported database value.
                     source_type: "pdf",
                     source_name: OUTLINE_STORAGE_SOURCE,
                 }),
             });
-    
+
             const newOutlineNote =
                 convertDatabaseNoteToCanvasNote(data.note);
-    
-            // Immediately show it on the Canvas.
-            setNotes((prevNotes) => [
-                ...prevNotes,
+
+            setNotes((previousNotes) => [
+                ...previousNotes,
                 newOutlineNote,
             ]);
-    
-            // Immediately show it in the Cabinet.
+
             const newCabinetFile =
                 convertNoteToCabinetFile(newOutlineNote);
-    
-            setFiles((prevFiles) => [
+
+            setFiles((previousFiles) => [
                 newCabinetFile,
-                ...prevFiles,
+                ...previousFiles,
             ]);
-    
-            // Close the Framework interfaces.
+
             setIsFrameworkExpanded(false);
             setIsFrameworkPanelOpen(false);
-    
-            // Open the new Outline in the existing note editor.
+
             handleOpenNote(newOutlineNote);
-    
-            alert("Outline created and opened.");
+
+            alert("AI outline created and opened.");
         } catch (error) {
             console.error("Convert to Outline error:", error);
-        
+
+            setFrameworkGenerationError(
+                error.message ||
+                "Failed to convert the Framework into an Outline."
+            );
+
             alert(
                 error.message ||
                 "Failed to create the Outline."
