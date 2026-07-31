@@ -118,7 +118,11 @@ export async function apiRequest(path, options = {}) {
             ...fetchOptions,
             headers,
         });
-    } catch {
+    } catch (error) {
+        if (error.name === "AbortError") {
+            throw error;
+        }
+
         throw new Error(
             "Cannot connect to the server. Please check that the backend is running."
         );

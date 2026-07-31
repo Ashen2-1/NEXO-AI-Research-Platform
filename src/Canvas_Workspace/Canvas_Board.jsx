@@ -2700,62 +2700,230 @@ function CanvasBoard(){
 
     const handleGenerateFramework = async () => {
         if (selectedNotes.length === 0) {
-            alert("Select at least one note.");
+            setFrameworkGenerationError(
+                "Select at least one source note before generating a framework."
+            );
             return;
         }
-    
+
+        setFrameworkGenerationError("");
         setFrameworkStep("generating");
-    
+        setFrameworkSaveStatus("saving");
+
+        const abortController = new AbortController();
+        frameworkGenerationAbortRef.current = abortController;
+
         try {
-            const combinedText = selectedNotes
-                .map((n) => `SOURCE: ${n.title}\n${n.body}`)
-                .join("\n\n");
-    
-            const frameworkText = `
-    RESEARCH QUESTION
-    ${frameworkDirection || "What relationships exist across the selected sources?"}
-    
+            const selectedSourceNames = [
+                ...new Set(
+                    selectedFrameworkSources
+                        .map((source) => source.sourceName)
+                        .filter(Boolean)
+                ),
+            ];
+
+            /*
+            * Python RAG currently accepts one exact source_filter.
+            * With one selected document, filter it strictly.
+            * With multiple documents, put every filename into the prompt.
+            */
+            const sourceFilter =
+                selectedSourceNames.length === 1
+                    ? selectedSourceNames[0]
+                    : "";
+
+            const sourceList = selectedFrameworkSources
+                .map(
+                    (source, index) =>
+                        `${index + 1}. ${source.title}${
+                            source.sourceName &&
+                            source.sourceName !== source.title
+                                ? ` (${source.sourceName})`
+                                : ""
+                        }`
+                )
+                .join("\n");
+
+            const localContext = selectedFrameworkSources
+                .map((source) => {
+                    const context = getLocalSourceContext(source);
+
+                    if (!context) {
+                        return "";
+                    }
+
+                    return [
+                        `SOURCE: ${source.title}`,
+                        context,
+                    ].join("\n");
+                })
+                .filter(Boolean)
+                .join("\n\n---\n\n");
+
+            const requestedModules = getFrameworkModuleLabels();
+
+            const generationPrompt = `
+    You are NEXO, a multidisciplinary academic research assistant.
+
+    Create a rigorous research framework using only the selected source materials.
+    The research may concern arts, humanities, engineering, mathematics,
+    science, or another academic discipline. Do not assume it is art history.
+
+    SELECTED SOURCES
+    ${sourceList}
+
+    RESEARCH DIRECTION
+    ${frameworkDirection.trim() || "Infer a focused research question from the selected sources."}
+
     WORKING ARGUMENT
-    ${frameworkArgument || "The selected materials suggest a pattern of interpretation shaped by source context."}
-    
-    FRAMEWORK
-    
-    1. Key Concepts
-    - Extracted from selected sources
-    
-    2. Claims & Evidence
-    ${combinedText.slice(0, 2000)}
-    
-    3. Source Relationships
-    - These sources interact through shared themes
-    
-    4. Research Gaps
-    - Missing connections between sources
-    
-    5. Contribution
-    - A synthesized interpretation
+    ${frameworkArgument.trim() || "Propose a careful working argument supported by the selected sources."}
+
+    DETAIL LEVEL
+    ${frameworkDetailLevel}
+
+    REQUIRED MODULES
+    ${
+        requestedModules.length > 0
+            ? requestedModules.map((module) => `- ${module}`).join("\n")
+            : "- core concepts\n- claims and evidence\n- research gaps"
+    }
+
+    SOURCE-LINKING
+    ${
+        frameworkOptions.linkClaimsToSources
+            ? "Link claims to their supporting source filenames."
+            : "Source links are optional."
+    }
+
+    AVAILABLE LOCAL NOTE CONTEXT
+    ${localContext || "Use the retrieved document chunks from the selected source files."}
+
+    OUTPUT REQUIREMENTS
+    - Return clean Markdown only.
+    - Do not include a conversational introduction.
+    - Begin with "# Research Framework".
+    - Include a focused research question.
+    - Include a working argument or hypothesis.
+    - Organize the framework into numbered sections.
+    - Connect every major claim to evidence from the selected materials.
+    - Cite sources using their actual filenames.
+    - Do not invent quotations, evidence, authors, methods, or results.
+    - Write "NEEDS EVIDENCE" where the selected material is insufficient.
+    - End with research gaps and recommended next steps.
             `.trim();
-    
+
+            const result = await requestAiText({
+                question: generationPrompt,
+                useRag: true,
+                sourceFilter,
+                topK: Math.min(
+                    10,
+                    Math.max(5, selectedFrameworkSources.length * 3)
+                ),
+                signal: abortController.signal,
+            });
+
+            const frameworkText = result.answer
+                .replace(/^```(?:markdown)?\s*/i, "")
+                .replace(/\s*```$/i, "")
+                .trim();
+
+            if (!frameworkText) {
+                throw new Error(
+                    "The AI service returned an empty framework."
+                );
+            }
+
+            const nextVersion =
+                frameworkVersions.reduce(
+                    (highestVersion, framework) =>
+                        Math.max(
+                            highestVersion,
+                            Number(framework.version) || 0
+                        ),
+                    0
+                ) + 1;
+
+            const frameworkTitle = `Framework V${nextVersion}`;
+
+            const frameworkSources = selectedFrameworkSources.map(
+                (source) => ({
+                    id: source.id,
+                    title: source.title,
+                    sourceName: source.sourceName,
+                    noteKind: source.noteKind,
+                })
+            );
+
+            const frameworkMetadata = {
+                version: nextVersion,
+                sources: frameworkSources,
+                detailLevel: frameworkDetailLevel,
+                direction: frameworkDirection.trim(),
+                argument: frameworkArgument.trim(),
+                options: frameworkOptions,
+                generatedAt: new Date().toISOString(),
+            };
+
             const data = await apiRequest("/notes", {
                 method: "POST",
                 body: JSON.stringify({
-                    title: "Framework",
+                    title: frameworkTitle,
                     body: frameworkText,
+
+                    // Framework metadata and source links
+                    user_note: JSON.stringify(frameworkMetadata),
+
+                    /*
+                    * Keep source_type compatible with the existing database.
+                    * source_name identifies it as a Framework internally.
+                    */
+                    source_type: "pdf",
+                    source_name: FRAMEWORK_STORAGE_SOURCE,
+
+                    x: 0,
+                    y: 0,
                 }),
             });
-    
-            setCurrentFramework({
-                id: data.note.id,
-                content: frameworkText,
-            });
-    
+
+            const savedCanvasNote =
+                convertDatabaseNoteToCanvasNote(data.note);
+
+            const savedFramework =
+                convertFrameworkNoteToFramework(savedCanvasNote);
+
+            setCurrentFramework(savedFramework);
             setFrameworkEditorDraft(frameworkText);
+
+            setFrameworkVersions((previousFrameworks) =>
+                sortFrameworkVersions([
+                    savedFramework,
+                    ...previousFrameworks.filter(
+                        (framework) =>
+                            framework.id !== savedFramework.id
+                    ),
+                ])
+            );
+
+            frameworkLastSavedContentRef.current = frameworkText;
+            frameworkLatestDraftRef.current = frameworkText;
+
+            setFrameworkSaveStatus("saved");
             setFrameworkStep("output");
-    
-        } catch (err) {
-            console.error(err);
-            alert("Failed.");
+        } catch (error) {
+            console.error("Generate Framework error:", error);
+
+            if (error.name !== "AbortError") {
+                setFrameworkGenerationError(
+                    error.message ||
+                        "Failed to generate the framework."
+                );
+            }
+
+            setFrameworkSaveStatus("error");
             setFrameworkStep("setup");
+        } finally {
+            frameworkGenerationAbortRef.current = null;
         }
     };
 
