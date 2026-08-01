@@ -11,6 +11,9 @@ function Header({
 
     onUndo,
     onRedo,
+    canUndo = false,
+    canRedo = false,
+    isHistoryBusy = false,
     onSelectTool,
     onDeleteSelected,
     onPanTool,
@@ -83,8 +86,39 @@ function Header({
                 <div className="Header_Tool_Row">
                     {isCanvasMode && (
                         <>
-                            <button type="button" onClick={onUndo}>↶</button>
-                            <button type="button" onClick={onRedo}>↷</button>
+                            <button
+                                type="button"
+                                onClick={onUndo}
+                                disabled={
+                                    !canUndo ||
+                                    isHistoryBusy
+                                }
+                                aria-label="Undo canvas action"
+                                title={
+                                    isHistoryBusy
+                                        ? "Undo/Redo is restoring..."
+                                        : "Undo"
+                                }
+                            >
+                                ↶
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={onRedo}
+                                disabled={
+                                    !canRedo ||
+                                    isHistoryBusy
+                                }
+                                aria-label="Redo canvas action"
+                                title={
+                                    isHistoryBusy
+                                        ? "Undo/Redo is restoring..."
+                                        : "Redo"
+                                }
+                            >
+                                ↷
+                            </button>
 
                             <div className="Header_Divider" />
 
