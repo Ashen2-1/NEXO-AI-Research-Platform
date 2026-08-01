@@ -24,6 +24,7 @@ import { FaListOl } from "react-icons/fa";
 
 const FRAMEWORK_STORAGE_SOURCE = "__nexo_framework__";
 const OUTLINE_STORAGE_SOURCE = "__nexo_outline__";
+const HISTORY_LIMIT = 50;
 
 const getUploadedSourceType = (
     fileName = "",
@@ -231,7 +232,23 @@ function CanvasBoard(){
     const [redoStack, setRedoStack] = useState([]);
     const [isRestoringHistory, setIsRestoringHistory] = useState(false);
 
+    /*
+     * React state is used to render the Undo/Redo buttons.
+     * Refs are the synchronous source of truth used by event handlers,
+     * so rapid clicks cannot read an out-of-date stack.
+     */
+    const undoStackRef = useRef([]);
+    const redoStackRef = useRef([]);
+    const historyBusyRef = useRef(false);
+
     const dragStartSnapshot = useRef(null);
+    const dragSaveInProgressRef = useRef(false);
+
+    const panStartSnapshotRef = useRef(null);
+    const panHasMovedRef = useRef(false);
+
+    const zoomHistoryActiveRef = useRef(false);
+    const zoomHistoryTimerRef = useRef(null);
 
     const clusterDragRef = useRef({
         noteIds: [],
@@ -275,27 +292,170 @@ function CanvasBoard(){
     //     setNotes(formattedNotes);
     // };
     const getSnapshot = () => ({
-        notes: notes.map(n => ({
-            ...n
+        notes: notes.map((note) => ({
+            ...note,
         })),
-        links: links.map(l => ({
-            ...l
+        links: links.map((link) => ({
+            ...link,
         })),
         boardOffset: { ...boardOffset },
         boardScale,
     });
 
-    const restoreSnapshot = async (snapshot) => {
+    const isValidSnapshot = (snapshot) =>
+        Boolean(
+            snapshot &&
+                typeof snapshot === "object" &&
+                Array.isArray(snapshot.notes) &&
+                Array.isArray(snapshot.links) &&
+                snapshot.notes.every(
+                    (note) =>
+                        note &&
+                        typeof note === "object" &&
+                        note.id !== undefined &&
+                        note.id !== null
+                ) &&
+                snapshot.links.every(
+                    (link) =>
+                        link &&
+                        typeof link === "object"
+                )
+        );
+
+    const cloneSnapshot = (snapshot) => {
+        if (!isValidSnapshot(snapshot)) {
+            return null;
+        }
+
+        const snapshotScale = Number(
+            snapshot.boardScale
+        );
+
+        return {
+            notes: snapshot.notes.map((note) => ({
+                ...note,
+            })),
+            links: snapshot.links.map((link) => ({
+                ...link,
+            })),
+            boardOffset: {
+                x:
+                    Number(
+                        snapshot.boardOffset?.x
+                    ) || 0,
+                y:
+                    Number(
+                        snapshot.boardOffset?.y
+                    ) || 0,
+            },
+            boardScale:
+                Number.isFinite(snapshotScale) &&
+                snapshotScale > 0
+                    ? snapshotScale
+                    : 1,
+        };
+    };
+
+    const sanitizeHistoryStack = (
+        stack,
+        stackName
+    ) => {
+        const sourceStack = Array.isArray(stack)
+            ? stack
+            : [];
+
+        const validEntries = sourceStack
+            .filter(isValidSnapshot)
+            .slice(-HISTORY_LIMIT);
+
         if (
-            !snapshot ||
-            !Array.isArray(snapshot.notes) ||
-            !Array.isArray(snapshot.links)
+            validEntries.length !==
+            sourceStack.length
         ) {
-            alert("Invalid Undo/Redo history.");
+            console.warn(
+                `[History] Removed ${
+                    sourceStack.length -
+                    validEntries.length
+                } invalid or expired ${stackName} record(s).`
+            );
+        }
+
+        return validEntries;
+    };
+
+    const replaceUndoStack = (nextStack) => {
+        const sanitized = sanitizeHistoryStack(
+            nextStack,
+            "Undo"
+        );
+
+        undoStackRef.current = sanitized;
+        setUndoStack(sanitized);
+    };
+
+    const replaceRedoStack = (nextStack) => {
+        const sanitized = sanitizeHistoryStack(
+            nextStack,
+            "Redo"
+        );
+
+        redoStackRef.current = sanitized;
+        setRedoStack(sanitized);
+    };
+
+    const endZoomHistoryGesture = () => {
+        zoomHistoryActiveRef.current = false;
+
+        if (zoomHistoryTimerRef.current) {
+            window.clearTimeout(
+                zoomHistoryTimerRef.current
+            );
+            zoomHistoryTimerRef.current = null;
+        }
+    };
+
+    const pushUndoSnapshot = (
+        snapshot,
+        {
+            clearRedo = true,
+            source = "action",
+        } = {}
+    ) => {
+        const safeSnapshot =
+            cloneSnapshot(snapshot);
+
+        if (!safeSnapshot) {
+            console.warn(
+                "[History] Refused to add an invalid Undo snapshot.",
+                snapshot
+            );
             return false;
         }
-    
-        setIsRestoringHistory(true);
+
+        if (source !== "zoom") {
+            endZoomHistoryGesture();
+        }
+
+        replaceUndoStack([
+            ...undoStackRef.current,
+            safeSnapshot,
+        ]);
+
+        if (clearRedo) {
+            replaceRedoStack([]);
+        }
+
+        return true;
+    };
+
+    const restoreSnapshot = async (snapshot) => {
+        if (!isValidSnapshot(snapshot)) {
+            console.warn(
+                "[History] Ignored an invalid Undo/Redo snapshot.",
+                snapshot
+            );
+            return false;
+        }
     
         const getLinkKey = (fromNoteId, toNoteId) =>
             `${String(fromNoteId)}::${String(toNoteId)}`;
@@ -393,24 +553,72 @@ function CanvasBoard(){
              */
             if (sameNoteSet) {
                 const restoredNotes = [];
-    
+
+                const currentNotesByIdForFastPath =
+                    new Map(
+                        notes.map((note) => [
+                            String(note.id),
+                            note,
+                        ])
+                    );
+
                 for (const snapshotNote of snapshot.notes) {
-                    const updatedNote =
-                        await updateNoteInDatabase(
-                            snapshotNote.id,
-                            getNotePatch(snapshotNote)
+                    const currentNote =
+                        currentNotesByIdForFastPath.get(
+                            String(snapshotNote.id)
                         );
-    
-                    if (!updatedNote) {
+
+                    if (!currentNote) {
                         throw new Error(
-                            `Could not restore note "${snapshotNote.title}".`
+                            `Could not find note "${snapshotNote.title}" while restoring history.`
                         );
                     }
-    
+
+                    /*
+                     * Pan/Zoom histories do not change any database field.
+                     * Moving one Note should PATCH that Note only, rather
+                     * than PATCHing every Note on the board. This keeps Undo
+                     * fast and greatly reduces the window for repeat clicks.
+                     */
+                    const needsDatabaseUpdate =
+                        currentNote.title !==
+                            snapshotNote.title ||
+                        (currentNote.body ?? "") !==
+                            (snapshotNote.body ?? "") ||
+                        (currentNote.userNote ?? "") !==
+                            (snapshotNote.userNote ?? "") ||
+                        Number(currentNote.x) !==
+                            Number(snapshotNote.x) ||
+                        Number(currentNote.y) !==
+                            Number(snapshotNote.y) ||
+                        Boolean(currentNote.locked) !==
+                            Boolean(snapshotNote.locked) ||
+                        Boolean(currentNote.pinned) !==
+                            Boolean(snapshotNote.pinned) ||
+                        (currentNote.clusterId ?? null) !==
+                            (snapshotNote.clusterId ?? null);
+
+                    let updatedNote = null;
+
+                    if (needsDatabaseUpdate) {
+                        updatedNote =
+                            await updateNoteInDatabase(
+                                snapshotNote.id,
+                                getNotePatch(snapshotNote)
+                            );
+
+                        if (!updatedNote) {
+                            throw new Error(
+                                `Could not restore note "${snapshotNote.title}".`
+                            );
+                        }
+                    }
+
                     restoredNotes.push({
+                        ...currentNote,
                         ...snapshotNote,
-                        ...updatedNote,
-    
+                        ...(updatedNote || {}),
+
                         // Database response does not store selection.
                         selected: Boolean(
                             snapshotNote.selected
@@ -657,8 +865,6 @@ function CanvasBoard(){
             await loadLinksFromDatabase();
     
             return false;
-        } finally {
-            setIsRestoringHistory(false);
         }
     };
 
@@ -996,14 +1202,7 @@ function CanvasBoard(){
                 ]
             );
 
-            setUndoStack(
-                (stack) => [
-                    ...stack,
-                    before,
-                ]
-            );
-
-            setRedoStack([]);
+            pushUndoSnapshot(before);
         } catch (error) {
             console.error(
                 "Create database note error:",
@@ -1294,6 +1493,13 @@ function CanvasBoard(){
         note
     ) => {
         event.stopPropagation();
+
+        if (
+            historyBusyRef.current ||
+            dragSaveInProgressRef.current
+        ) {
+            return;
+        }
     
         setHasDraggedNote(false);
     
@@ -1443,47 +1649,139 @@ function CanvasBoard(){
         }
     
         if (isPanningBoard) {
-            setBoardOffset({
+            const nextOffset = {
                 x:
                     event.clientX -
                     panStart.x,
-    
+
                 y:
                     event.clientY -
                     panStart.y,
-            });
+            };
+
+            const panStartSnapshot =
+                panStartSnapshotRef.current;
+
+            if (
+                panStartSnapshot &&
+                (Math.abs(
+                    nextOffset.x -
+                        panStartSnapshot.boardOffset.x
+                ) > 0.5 ||
+                    Math.abs(
+                        nextOffset.y -
+                            panStartSnapshot.boardOffset.y
+                    ) > 0.5)
+            ) {
+                panHasMovedRef.current = true;
+            }
+
+            setBoardOffset(nextOffset);
         }
     };
     /***************************************************************************/
     const handleCanvasMouseUp = async () => {
+        /*
+         * Copy every mutable ref into local constants BEFORE any await
+         * or cleanup. The old code placed dragStartSnapshot.current
+         * inside a React state callback and then immediately set the ref
+         * to null, so React could append null to undoStack.
+         */
+        const wasDragging =
+            draggingNoteId !== null;
+
         const dragInfo =
             clusterDragRef.current;
-    
+
+        const dragBeforeSnapshot =
+            dragStartSnapshot.current;
+
+        const wasPanning =
+            isPanningBoard;
+
+        const panBeforeSnapshot =
+            panStartSnapshotRef.current;
+
+        const panMoved =
+            panHasMovedRef.current;
+
+        /*
+         * Reset the gesture synchronously, before the database request.
+         * onMouseUp and onMouseLeave can otherwise finish the same drag
+         * twice while the first PATCH request is still pending.
+         */
+        setDraggingNoteId(null);
+        setIsPanningBoard(false);
+
+        clusterDragRef.current = {
+            noteIds: [],
+            startWorldX: 0,
+            startWorldY: 0,
+            startPositions: {},
+            lastDeltaX: 0,
+            lastDeltaY: 0,
+            hasMoved: false,
+        };
+
+        dragStartSnapshot.current = null;
+        panStartSnapshotRef.current = null;
+        panHasMovedRef.current = false;
+
         if (
-            draggingNoteId !== null &&
-            dragInfo.hasMoved
+            wasPanning &&
+            panMoved &&
+            panBeforeSnapshot
         ) {
-            const movedNotes = dragInfo.noteIds.map(
-                (noteId) => {
-                    const startPosition =
-                        dragInfo.startPositions[
-                            noteId
-                        ];
-    
-                    return {
-                        id: noteId,
-    
-                        x:
-                            startPosition.x +
-                            dragInfo.lastDeltaX,
-    
-                        y:
-                            startPosition.y +
-                            dragInfo.lastDeltaY,
-                    };
-                }
+            pushUndoSnapshot(
+                panBeforeSnapshot
             );
-    
+        }
+
+        if (
+            !wasDragging ||
+            !dragInfo.hasMoved ||
+            dragInfo.noteIds.length === 0
+        ) {
+            return;
+        }
+
+        if (dragSaveInProgressRef.current) {
+            return;
+        }
+
+        dragSaveInProgressRef.current = true;
+
+        try {
+            const movedNotes =
+                dragInfo.noteIds
+                    .map((noteId) => {
+                        const startPosition =
+                            dragInfo.startPositions[
+                                noteId
+                            ];
+
+                        if (!startPosition) {
+                            return null;
+                        }
+
+                        return {
+                            id: noteId,
+
+                            x:
+                                startPosition.x +
+                                dragInfo.lastDeltaX,
+
+                            y:
+                                startPosition.y +
+                                dragInfo.lastDeltaY,
+                        };
+                    })
+                    .filter(Boolean);
+
+            if (movedNotes.length === 0) {
+                return;
+            }
+
             const updateResults =
                 await Promise.all(
                     movedNotes.map((note) =>
@@ -1496,72 +1794,100 @@ function CanvasBoard(){
                         )
                     )
                 );
-    
+
             const failed = updateResults.some(
                 (result) => !result
             );
-    
+
             if (failed) {
                 await loadNotesFromDatabase();
-    
+
                 alert(
                     "The cluster position could not be fully saved."
                 );
-            } else if (
-                dragStartSnapshot.current
-            ) {
-                setUndoStack((stack) => [
-                    ...stack,
-                    dragStartSnapshot.current,
-                ]);
-    
-                setRedoStack([]);
+                return;
             }
+
+            if (dragBeforeSnapshot) {
+                pushUndoSnapshot(
+                    dragBeforeSnapshot
+                );
+            }
+        } finally {
+            dragSaveInProgressRef.current = false;
         }
-    
-        setDraggingNoteId(null);
-        setIsPanningBoard(false);
-    
-        clusterDragRef.current = {
-            noteIds: [],
-            startWorldX: 0,
-            startWorldY: 0,
-            startPositions: {},
-            lastDeltaX: 0,
-            lastDeltaY: 0,
-            hasMoved: false,
-        };
-    
-        dragStartSnapshot.current = null;
     };
     /***************************************************************************/
     const handleCanvasWheel = (event) => {
-        if (undoStack.length === 0 || undoStack[undoStack.length - 1]._zoom !== true) {
-            setUndoStack(stack => [...stack, { ...getSnapshot(), _zoom: true }]);
-            setRedoStack([]);
-        }
-
         event.preventDefault();
+
+        if (historyBusyRef.current) {
+            return;
+        }
 
         const zoomSpeed = 0.0015;
         const minScale = 0.4;
         const maxScale = 2.5;
 
-        const canvasRect = event.currentTarget.getBoundingClientRect();
+        const canvasRect =
+            event.currentTarget.getBoundingClientRect();
 
-        const mouseX = event.clientX - canvasRect.left;
-        const mouseY = event.clientY - canvasRect.top;
+        const mouseX =
+            event.clientX - canvasRect.left;
+        const mouseY =
+            event.clientY - canvasRect.top;
 
-        const worldX = (mouseX - boardOffset.x) / boardScale;
-        const worldY = (mouseY - boardOffset.y) / boardScale;
+        const worldX =
+            (mouseX - boardOffset.x) /
+            boardScale;
+        const worldY =
+            (mouseY - boardOffset.y) /
+            boardScale;
 
         const nextScale = Math.min(
             maxScale,
-            Math.max(minScale, boardScale - event.deltaY * zoomSpeed)
+            Math.max(
+                minScale,
+                boardScale -
+                    event.deltaY * zoomSpeed
+            )
         );
 
-        const nextOffsetX = mouseX - worldX * nextScale;
-        const nextOffsetY = mouseY - worldY * nextScale;
+        if (
+            Math.abs(nextScale - boardScale) <
+            0.000001
+        ) {
+            return;
+        }
+
+        if (!zoomHistoryActiveRef.current) {
+            const saved = pushUndoSnapshot(
+                getSnapshot(),
+                { source: "zoom" }
+            );
+
+            zoomHistoryActiveRef.current =
+                saved;
+        }
+
+        if (zoomHistoryTimerRef.current) {
+            window.clearTimeout(
+                zoomHistoryTimerRef.current
+            );
+        }
+
+        zoomHistoryTimerRef.current =
+            window.setTimeout(() => {
+                zoomHistoryActiveRef.current =
+                    false;
+                zoomHistoryTimerRef.current =
+                    null;
+            }, 180);
+
+        const nextOffsetX =
+            mouseX - worldX * nextScale;
+        const nextOffsetY =
+            mouseY - worldY * nextScale;
 
         setBoardScale(nextScale);
         setBoardOffset({
@@ -1571,14 +1897,25 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const handleBoardMouseDown = (event) => {
-        const isCanvasBackground = event.target.classList.contains("Canvas_Center") || event.target.classList.contains("Canvas_World");
+        const isCanvasBackground =
+            event.target.classList.contains(
+                "Canvas_Center"
+            ) ||
+            event.target.classList.contains(
+                "Canvas_World"
+            );
 
-        if (!isCanvasBackground) {
+        if (
+            !isCanvasBackground ||
+            historyBusyRef.current ||
+            dragSaveInProgressRef.current
+        ) {
             return;
         }
 
-        setUndoStack(stack => [...stack, getSnapshot()]);
-        setRedoStack([]);
+        panStartSnapshotRef.current =
+            getSnapshot();
+        panHasMovedRef.current = false;
 
         setIsPanningBoard(true);
         setPanStart({
@@ -1588,9 +1925,17 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     const handleResetView = () => {
-        setUndoStack(stack => [...stack, getSnapshot()]);
-        setRedoStack([]);
-    
+        if (
+            historyBusyRef.current ||
+            (boardOffset.x === 0 &&
+                boardOffset.y === 0 &&
+                boardScale === 1)
+        ) {
+            return;
+        }
+
+        pushUndoSnapshot(getSnapshot());
+
         setBoardOffset({ x: 0, y: 0 });
         setBoardScale(1);
     };
@@ -1708,12 +2053,7 @@ function CanvasBoard(){
                     )
                 );
     
-                setUndoStack((stack) => [
-                    ...stack,
-                    before,
-                ]);
-    
-                setRedoStack([]);
+                pushUndoSnapshot(before);
             } catch (error) {
                 console.error(
                     "Unlink selected notes error:",
@@ -1782,12 +2122,7 @@ function CanvasBoard(){
                 ...successfullyCreatedLinks,
             ]);
     
-            setUndoStack((stack) => [
-                ...stack,
-                before,
-            ]);
-    
-            setRedoStack([]);
+            pushUndoSnapshot(before);
         } catch (error) {
             console.error(
                 "Link selected notes error:",
@@ -1888,8 +2223,7 @@ function CanvasBoard(){
             )
         );
     
-        setUndoStack((stack) => [...stack, before]);
-        setRedoStack([]);
+        pushUndoSnapshot(before);
     
         if (lockedCount > 0) {
             alert(
@@ -2040,12 +2374,7 @@ function CanvasBoard(){
             )
         );
     
-        setUndoStack((stack) => [
-            ...stack,
-            before,
-        ]);
-    
-        setRedoStack([]);
+        pushUndoSnapshot(before);
     
         handleCloseNote();
     };
@@ -3142,8 +3471,55 @@ ${frameworkEditorDraft.slice(0, 60000)}
 
         return () => {
             frameworkGenerationAbortRef.current?.abort();
+
+            if (zoomHistoryTimerRef.current) {
+                window.clearTimeout(
+                    zoomHistoryTimerRef.current
+                );
+            }
         };
     }, []);
+    /***************************************************************************/
+    useEffect(() => {
+        /*
+         * These effects are a Fast Refresh safety net. Normal history
+         * writes already update the refs synchronously through the helpers.
+         * They also remove a corrupted record left by an older build.
+         */
+        const cleanUndoStack =
+            sanitizeHistoryStack(
+                undoStack,
+                "Undo"
+            );
+
+        undoStackRef.current =
+            cleanUndoStack;
+
+        if (
+            cleanUndoStack.length !==
+            undoStack.length
+        ) {
+            setUndoStack(cleanUndoStack);
+        }
+    }, [undoStack]);
+
+    useEffect(() => {
+        const cleanRedoStack =
+            sanitizeHistoryStack(
+                redoStack,
+                "Redo"
+            );
+
+        redoStackRef.current =
+            cleanRedoStack;
+
+        if (
+            cleanRedoStack.length !==
+            redoStack.length
+        ) {
+            setRedoStack(cleanRedoStack);
+        }
+    }, [redoStack]);
     /***************************************************************************/
     useEffect(() => {
         frameworkLatestDraftRef.current = frameworkEditorDraft;
@@ -3252,71 +3628,134 @@ ${frameworkEditorDraft.slice(0, 60000)}
     }, [notes, links, openedNote]);
 
     const handleUndo = async () => {
+        /*
+         * A ref lock is required here. React state does not change
+         * synchronously, so two very fast clicks can both observe
+         * isRestoringHistory === false and start two restorations.
+         */
         if (
-            undoStack.length === 0 ||
-            isRestoringHistory
+            historyBusyRef.current ||
+            dragSaveInProgressRef.current
         ) {
             return;
         }
-    
+
+        const cleanUndoStack =
+            sanitizeHistoryStack(
+                undoStackRef.current,
+                "Undo"
+            );
+
+        if (
+            cleanUndoStack.length !==
+            undoStackRef.current.length
+        ) {
+            replaceUndoStack(cleanUndoStack);
+        }
+
         const previousSnapshot =
-            undoStack[undoStack.length - 1];
-    
-        // Save the current state for Redo,
-        // but do not change either stack yet.
-        const currentSnapshot = getSnapshot();
-    
-        const restored = await restoreSnapshot(
-            previousSnapshot
-        );
-    
-        if (!restored) {
-            // Keep both stacks unchanged when restoration fails.
+            cleanUndoStack.at(-1);
+
+        if (!previousSnapshot) {
             return;
         }
-    
-        setUndoStack((stack) =>
-            stack.slice(0, -1)
-        );
-    
-        setRedoStack((stack) => [
-            ...stack,
-            currentSnapshot,
-        ]);
+
+        const currentSnapshot =
+            cloneSnapshot(getSnapshot());
+
+        if (!currentSnapshot) {
+            return;
+        }
+
+        historyBusyRef.current = true;
+        setIsRestoringHistory(true);
+        endZoomHistoryGesture();
+
+        try {
+            const restored =
+                await restoreSnapshot(
+                    previousSnapshot
+                );
+
+            if (!restored) {
+                return;
+            }
+
+            replaceUndoStack(
+                cleanUndoStack.slice(0, -1)
+            );
+
+            replaceRedoStack([
+                ...redoStackRef.current,
+                currentSnapshot,
+            ]);
+        } finally {
+            historyBusyRef.current = false;
+            setIsRestoringHistory(false);
+        }
     };
 
     const handleRedo = async () => {
         if (
-            redoStack.length === 0 ||
-            isRestoringHistory
+            historyBusyRef.current ||
+            dragSaveInProgressRef.current
         ) {
             return;
         }
-    
+
+        const cleanRedoStack =
+            sanitizeHistoryStack(
+                redoStackRef.current,
+                "Redo"
+            );
+
+        if (
+            cleanRedoStack.length !==
+            redoStackRef.current.length
+        ) {
+            replaceRedoStack(cleanRedoStack);
+        }
+
         const nextSnapshot =
-            redoStack[redoStack.length - 1];
-    
-        // Save the current state for Undo,
-        // but do not change either stack yet.
-        const currentSnapshot = getSnapshot();
-    
-        const restored = await restoreSnapshot(
-            nextSnapshot
-        );
-    
-        if (!restored) {
-            // Keep both stacks unchanged when restoration fails.
+            cleanRedoStack.at(-1);
+
+        if (!nextSnapshot) {
             return;
         }
-    
-        setRedoStack((stack) =>
-            stack.slice(0, -1)
-        );
-    
-        setUndoStack((stack) => [
-            ...stack,
-            currentSnapshot,
-        ]);
+
+        const currentSnapshot =
+            cloneSnapshot(getSnapshot());
+
+        if (!currentSnapshot) {
+            return;
+        }
+
+        historyBusyRef.current = true;
+        setIsRestoringHistory(true);
+        endZoomHistoryGesture();
+
+        try {
+            const restored =
+                await restoreSnapshot(
+                    nextSnapshot
+                );
+
+            if (!restored) {
+                return;
+            }
+
+            replaceRedoStack(
+                cleanRedoStack.slice(0, -1)
+            );
+
+            replaceUndoStack([
+                ...undoStackRef.current,
+                currentSnapshot,
+            ]);
+        } finally {
+            historyBusyRef.current = false;
+            setIsRestoringHistory(false);
+        }
     };
 
     const handleSelectTool = () => {
@@ -3347,8 +3786,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
 
             const newCanvasNote = convertDatabaseNoteToCanvasNote(data.note);
             setNotes((prevNotes) => [...prevNotes, newCanvasNote]);
-            setUndoStack(s => [...s, before]);
-            setRedoStack([]);
+            pushUndoSnapshot(before);
         } catch (error) {
             console.error("Create blank note error:", error);
             alert("Failed to create note.");
@@ -3518,12 +3956,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
             })
         );
     
-        setUndoStack((stack) => [
-            ...stack,
-            before,
-        ]);
-    
-        setRedoStack([]);
+        pushUndoSnapshot(before);
     };
 
     const handleAutoArrange = async () => {
@@ -3698,12 +4131,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
             return;
         }
     
-        setUndoStack((stack) => [
-            ...stack,
-            before,
-        ]);
-    
-        setRedoStack([]);
+        pushUndoSnapshot(before);
     };
 
     const handleLockSelected = async () => {
@@ -3772,14 +4200,8 @@ ${frameworkEditorDraft.slice(0, 60000)}
             )
         );
     
-        // 加入 Undo history
-        setUndoStack((stack) => [
-            ...stack,
-            before,
-        ]);
-    
-        // 新操作发生后，清空 Redo history
-        setRedoStack([]);
+        // 加入 Undo history，并在同一个 helper 中清空 Redo。
+        pushUndoSnapshot(before);
     
         if (successfulIds.size !== selected.length) {
             alert(
@@ -3854,14 +4276,8 @@ ${frameworkEditorDraft.slice(0, 60000)}
             )
         );
     
-        // 加入 Undo history
-        setUndoStack((stack) => [
-            ...stack,
-            before,
-        ]);
-    
-        // 新操作发生后，清空 Redo history
-        setRedoStack([]);
+        // 加入 Undo history，并在同一个 helper 中清空 Redo。
+        pushUndoSnapshot(before);
     
         if (successfulIds.size !== selected.length) {
             alert(
@@ -3937,6 +4353,9 @@ ${frameworkEditorDraft.slice(0, 60000)}
 
                 onUndo={handleUndo}
                 onRedo={handleRedo}
+                canUndo={undoStack.length > 0}
+                canRedo={redoStack.length > 0}
+                isHistoryBusy={isRestoringHistory}
                 onSelectTool={handleSelectTool}
                 onDeleteSelected={handleDeleteSelectedNote}
                 onPanTool={handlePanTool}
