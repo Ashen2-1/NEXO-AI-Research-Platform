@@ -212,6 +212,22 @@ router.post(
                         req.file.originalname
                     );
 
+                const safeUserId = String(
+                        req.user?.id || ""
+                    ).trim();
+
+                const safeCanvasId = String(
+                    req.body?.canvas_id ||
+                    req.body?.canvasId ||
+                    "default"
+                ).trim() || "default";
+
+                if (!safeUserId) {
+                    return res.status(401).json({
+                        error: "Authenticated user ID is missing.",
+                    });
+                }
+
                 const fileUrl =
                     `${req.protocol}://${req.get(
                         "host"
@@ -249,6 +265,16 @@ router.post(
                     try {
                         const formData =
                             new FormData();
+
+                        formData.append(
+                            "user_id",
+                            safeUserId
+                        );
+
+                        formData.append(
+                            "canvas_id",
+                            safeCanvasId
+                        );
 
                         formData.append(
                             "file",
@@ -339,6 +365,9 @@ router.post(
                     .status(201)
                     .json({
                         ...ingestData,
+
+                        userId: safeUserId,
+                        canvasId: safeCanvasId,
 
                         file:
                             ingestData.file ||
