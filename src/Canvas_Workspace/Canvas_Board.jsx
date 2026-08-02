@@ -1461,10 +1461,10 @@ function CanvasBoard(){
                                 return child;
                             }
 
-                            const parts = child.split(/(\[\d+\])/g);
+                            const parts = child.split(/(\[S\d+\])/g);
 
                             return parts.map((part, index) => {
-                                const match = part.match(/^\[(\d+)\]$/);
+                                const match = part.match(/^\[S(\d+)\]$/);
 
                                 if (!match) {
                                     return part;
