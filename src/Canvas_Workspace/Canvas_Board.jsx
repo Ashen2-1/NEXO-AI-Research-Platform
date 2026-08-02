@@ -1322,6 +1322,11 @@ function CanvasBoard(){
     );
     /***************************************************************************/
     const handleSendMessage = async () => {
+
+        if (isAiThinking) {
+            return;
+        }
+        
         if (!chatInput.trim()) {
             return;
         };
@@ -1386,12 +1391,20 @@ function CanvasBoard(){
                 question,
                 shouldUseRag,
                 selectedSources: uniqueSelectedSourceNames,
-                sourceFilter,
+                sourceFilter: uniqueSelectedSourceNames[0] || "",
+                sourceFilters: uniqueSelectedSourceNames,
                 enhancedQuestion,
             });
 
+            const abortController = new AbortController();
+
+            const timeoutId = window.setTimeout(() => {
+                abortController.abort();
+            }, 90000);
+
             const data = await apiRequest("/ai/query-text", {
                 method: "POST",
+                signal: abortController.signal,
                 body: JSON.stringify({
                     question: enhancedQuestion,
                     top_k: 5,
@@ -1425,6 +1438,7 @@ function CanvasBoard(){
 
             setChatMessages((prevMessages) => [...prevMessages, errorMessage]);
         } finally {
+            window.clearTimeout(timeoutId);
             setIsAiThinking(false);
         }
     };

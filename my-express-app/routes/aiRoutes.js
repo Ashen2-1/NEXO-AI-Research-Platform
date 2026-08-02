@@ -219,7 +219,7 @@ router.post(
                 // 新接口：发送完整来源数组
                 formData.append(
                     "source_filters",
-                    JSON.stringify(selectedSources)
+                    JSON.stringify(Array.isArray(source_filters) ? source_filters : [])
                 );
 
                 // 暂时兼容 Python 旧的单来源接口
