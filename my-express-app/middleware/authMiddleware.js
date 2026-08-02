@@ -36,7 +36,7 @@ const authMiddleware = (req, res, next) => {
 
         next();
     } catch (error) {
-        // 只记录错误类型，绝对不要记录 JWT token
+        
         console.warn(
             "Authentication failed:",
             error.name
