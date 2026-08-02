@@ -126,6 +126,7 @@ router.post(
             question,
             top_k = 5,
             source_filter = "",
+            source_filters = [],
             use_rag = false,
             chat_history = [],
             canvas_id = "default",
@@ -178,18 +179,25 @@ router.post(
             );
 
         const formData = new URLSearchParams();
-        
-        const safeUserId = String(req.user.id);
-        const safeCanvasId = String(canvas_id || "default").trim() || "default";
 
-        formData.append("question", question);
-        formData.append("user_id", safeUserId);
-        formData.append("canvas_id", safeCanvasId);
+        formData.append(
+            "question",
+            String(question).trim()
+        );
+
+        formData.append(
+            "user_id",
+            userId
+        );
+
+        formData.append(
+            "canvas_id",
+            canvasId
+        );
+
         formData.append(
             "chat_history",
-            JSON.stringify(
-                Array.isArray(chat_history) ? chat_history : []
-            )
+            JSON.stringify(safeChatHistory)
         );
 
         let endpoint = "/query/general";
@@ -198,31 +206,12 @@ router.post(
             endpoint = "/query/text";
 
             formData.append(
-                "user_id",
-                userId
-            );
-
-            formData.append(
-                "canvas_id",
-                canvasId
-            );
-
-            formData.append(
                 "top_k",
                 String(safeTopK)
             );
 
-            formData.append(
-                "source_filters",
-                JSON.stringify(selectedSources)
-            );
-
-            /*
-             * 暂时兼容旧的单文件过滤字段。
-             */
-            if (
-                selectedSources.length === 1
-            ) {
+            
+            if (selectedSources.length > 0) {
                 formData.append(
                     "source_filter",
                     selectedSources[0]
@@ -237,14 +226,12 @@ router.post(
             `${fastApiBaseUrl}${endpoint}`;
 
         console.log("AI ROUTE DEBUG:", {
-            userId: safeUserId,
-            canvasId: safeCanvasId,
+            userId,
+            canvasId,
             shouldUseRag,
             endpoint,
-            sourceFilter: source_filter || null,
-            historyCount: Array.isArray(chat_history)
-                ? chat_history.length
-                : 0,
+            selectedSources,
+            historyCount: safeChatHistory.length,
             targetUrl,
         });
 
