@@ -20,6 +20,9 @@ import { IoLinkSharp } from "react-icons/io5";
 import { MdDelete } from "react-icons/md";
 import { FaListUl } from "react-icons/fa";
 import { FaListOl } from "react-icons/fa";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 
 
 const FRAMEWORK_STORAGE_SOURCE = "__nexo_framework__";
@@ -1368,21 +1371,15 @@ function CanvasBoard(){
 
             const shouldUseRag = uniqueSelectedSourceNames.length > 0;
 
-            const sourceFilter =
-                uniqueSelectedSourceNames.length === 1
-                    ? uniqueSelectedSourceNames[0]
-                    : "";
-
             const selectedSourcesText =
                 uniqueSelectedSourceNames.length > 0
-                    ? uniqueSelectedSourceNames.map((name, index) => `${index + 1}. ${name}`).join("\n")
+                    ? uniqueSelectedSourceNames
+                        .map((name, index) => `${index + 1}. ${name}`)
+                        .join("\n")
                     : "No selected sources.";
 
-            const isAskingSelectedSources =
-                /(source|sources|doc|docs|document|documents|selected|selecting|file|files|name|names)/i.test(question);
-
             const enhancedQuestion = shouldUseRag
-                ? `The user has selected the following source files:\n${selectedSourcesText}\n\nUser question: ${question}`
+                ? `The user has selected these source files:\n${selectedSourcesText}\n\nAnswer using only these selected sources.\n\nUser question: ${question}`
                 : question;
 
             console.log("CHAT RAG DEBUG:", {
@@ -1397,9 +1394,10 @@ function CanvasBoard(){
                 method: "POST",
                 body: JSON.stringify({
                     question: enhancedQuestion,
-                    top_k: 3,
+                    top_k: 5,
                     use_rag: shouldUseRag,
-                    source_filter: sourceFilter,
+                    source_filters: uniqueSelectedSourceNames,
+                    source_filter: uniqueSelectedSourceNames[0] || "",
                     chat_history: chatHistoryForApi,
                     canvas_id: "default",
                 }),
@@ -1429,6 +1427,61 @@ function CanvasBoard(){
         } finally {
             setIsAiThinking(false);
         }
+    };
+
+    const renderAiMarkdown = (text, sources = []) => {
+        return (
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+                components={{
+                    p({ children }) {
+                        const enhancedChildren = React.Children.map(children, (child) => {
+                            if (typeof child !== "string") {
+                                return child;
+                            }
+
+                            const parts = child.split(/(\[\d+\])/g);
+
+                            return parts.map((part, index) => {
+                                const match = part.match(/^\[(\d+)\]$/);
+
+                                if (!match) {
+                                    return part;
+                                }
+
+                                const citationNumber = Number(match[1]);
+                                const source = sources[citationNumber - 1];
+
+                                if (!source) {
+                                    return part;
+                                }
+
+                                return (
+                                    <button
+                                        key={`${part}-${index}`}
+                                        type="button"
+                                        className="Citation_Button"
+                                        title={`${source.file || "Source"} · chunk ${source.chunk || ""}\n${source.preview || ""}`}
+                                        onClick={() => {
+                                            alert(
+                                                `${source.file || "Source"}\nChunk ${source.chunk || ""}\n\n${source.preview || "No preview available."}`
+                                            );
+                                        }}
+                                    >
+                                        {part}
+                                    </button>
+                                );
+                            });
+                        });
+
+                        return <p>{enhancedChildren}</p>;
+                    },
+                }}
+            >
+                {text}
+            </ReactMarkdown>
+        );
     };
     /***************************************************************************/
     const handleChatKeyDown = (event) => {
@@ -2650,9 +2703,18 @@ function CanvasBoard(){
         question,
         useRag = false,
         sourceFilter = "",
+        sourceFilters = [],
         topK = 5,
         signal,
     }) => {
+        const cleanSourceFilters = [
+            ...new Set(
+                (sourceFilters || [])
+                    .map((source) => String(source || "").trim())
+                    .filter(Boolean)
+            ),
+        ];
+
         const data = await apiRequest("/ai/query-text", {
             method: "POST",
             ...(signal ? { signal } : {}),
@@ -2660,7 +2722,8 @@ function CanvasBoard(){
                 question,
                 top_k: topK,
                 use_rag: useRag,
-                source_filter: sourceFilter,
+                source_filters: cleanSourceFilters,
+                source_filter: sourceFilter || cleanSourceFilters[0] || "",
                 chat_history: [],
                 canvas_id: "default",
             }),
@@ -3148,7 +3211,8 @@ function CanvasBoard(){
             const result = await requestAiText({
                 question: generationPrompt,
                 useRag: true,
-                sourceFilter,
+                sourceFilters: selectedSourceNames,
+                sourceFilter: selectedSourceNames[0] || "",
                 topK: Math.min(
                     10,
                     Math.max(5, selectedFrameworkSources.length * 3)
@@ -4711,7 +4775,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                                         >
                                                             {message.role === "ai" ? (
                                                                 <div className="Chat_Message_Text">
-                                                                    <ReactMarkdown>{message.text}</ReactMarkdown>
+                                                                    <ReactMarkdown>{renderAiMarkdown(message.text, message.sources || [])}</ReactMarkdown>
                                                                 </div>
                                                             ) : (
                                                                 <div className="Chat_Message_Text">
