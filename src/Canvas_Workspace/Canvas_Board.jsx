@@ -1348,6 +1348,8 @@ function CanvasBoard(){
         setChatInput("");
         setIsAiThinking(true);
 
+        let timeoutId = null;
+
         try {
             // const isGeneralGreeting = /^(hi|hello|hey|how are you|thanks|thank you)\??$/i.test(question.trim());
             // const shouldUseRag = selectedNotesCount > 0 && !isGeneralGreeting;
@@ -1438,7 +1440,9 @@ function CanvasBoard(){
 
             setChatMessages((prevMessages) => [...prevMessages, errorMessage]);
         } finally {
-            window.clearTimeout(timeoutId);
+            if (timeoutId) {
+                window.clearTimeout(timeoutId);
+            }
             setIsAiThinking(false);
         }
     };
