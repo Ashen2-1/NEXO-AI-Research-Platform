@@ -1401,6 +1401,7 @@ function CanvasBoard(){
                     use_rag: shouldUseRag,
                     source_filter: sourceFilter,
                     chat_history: chatHistoryForApi,
+                    canvas_id: "default",
                 }),
             });
 
@@ -1419,7 +1420,9 @@ function CanvasBoard(){
             const errorMessage = {
                 id: Date.now() + 1,
                 role: "ai",
-                text: "Failed to get an answer from the AI service."
+                text:
+                    error?.message ||
+                    "Failed to get an answer from the AI service.",
             };
 
             setChatMessages((prevMessages) => [...prevMessages, errorMessage]);
@@ -2659,6 +2662,7 @@ function CanvasBoard(){
                 use_rag: useRag,
                 source_filter: sourceFilter,
                 chat_history: [],
+                canvas_id: "default",
             }),
         });
 
