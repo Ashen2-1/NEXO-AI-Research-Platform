@@ -1405,6 +1405,7 @@ function CanvasBoard(){
             }, 90000);
 
             const data = await apiRequest("/ai/query-text", {
+                
                 method: "POST",
                 signal: abortController.signal,
                 body: JSON.stringify({
@@ -1417,6 +1418,7 @@ function CanvasBoard(){
                     canvas_id: "default",
                 }),
             });
+            console.log("AI RESPONSE DATA:", data);
 
             const aiMessage = {
                 id: Date.now() + 1,
@@ -4793,7 +4795,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                                         >
                                                             {message.role === "ai" ? (
                                                                 <div className="Chat_Message_Text">
-                                                                    <ReactMarkdown>{renderAiMarkdown(message.text, message.sources || [])}</ReactMarkdown>
+                                                                    {renderAiMarkdown(message.text, message.sources || [])}
                                                                 </div>
                                                             ) : (
                                                                 <div className="Chat_Message_Text">
