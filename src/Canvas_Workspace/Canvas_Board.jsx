@@ -1326,7 +1326,7 @@ function CanvasBoard(){
         if (isAiThinking) {
             return;
         }
-        
+
         if (!chatInput.trim()) {
             return;
         };
@@ -1398,7 +1398,7 @@ function CanvasBoard(){
 
             const abortController = new AbortController();
 
-            const timeoutId = window.setTimeout(() => {
+            timeoutId = window.setTimeout(() => {
                 abortController.abort();
             }, 90000);
 
