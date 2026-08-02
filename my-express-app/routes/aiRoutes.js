@@ -114,6 +114,10 @@ const normalizeSourceFilters = (
                     String(source).trim()
                 )
                 .filter(Boolean)
+                .filter(
+                    (source) =>
+                        !source.startsWith("__nexo_")
+                )
         ),
     ].slice(0, 20);
 };
@@ -212,10 +216,19 @@ router.post(
 
             
             if (selectedSources.length > 0) {
+                // 新接口：发送完整来源数组
                 formData.append(
-                    "source_filter",
-                    selectedSources[0]
+                    "source_filters",
+                    JSON.stringify(selectedSources)
                 );
+
+                // 暂时兼容 Python 旧的单来源接口
+                if (selectedSources.length === 1) {
+                    formData.append(
+                        "source_filter",
+                        selectedSources[0]
+                    );
+                }
             }
         }
 
