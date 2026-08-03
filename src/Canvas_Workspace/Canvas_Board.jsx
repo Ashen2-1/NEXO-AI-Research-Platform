@@ -4668,7 +4668,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                     {isCabinetOpen && (
                         <>
                             <div className="Cabinet_Header">
-                                <h2>CABINTE</h2>
+                                <h2>CABINET</h2>
                                 <button className="Cabinet_Add_Button" onClick={()=>setShowUploadModal(true)}>+</button>
                             </div>
 
