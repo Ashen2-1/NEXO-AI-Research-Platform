@@ -2927,6 +2927,9 @@ function CanvasBoard(){
             sourceCount: Array.isArray(metadata.sources) ? metadata.sources.length : 0,
             detailLevel: metadata.detailLevel || "detailed",
             sources: Array.isArray(metadata.sources) ? metadata.sources : [],
+            citationSources: Array.isArray(metadata.citationSources)
+                ? metadata.citationSources
+                : [],
             direction: metadata.direction || "",
             argument: metadata.argument || "",
             options: metadata.options || {},
@@ -3535,6 +3538,7 @@ function CanvasBoard(){
             const frameworkMetadata = {
                 version: nextVersion,
                 sources: frameworkSources,
+                citationSources: result.sources || [],
                 detailLevel: frameworkDetailLevel,
                 direction: frameworkDirection.trim(),
                 argument: frameworkArgument.trim(),
@@ -5197,6 +5201,8 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     onClose={() => setIsFrameworkPanelOpen(false)}
                                     onExpand={() => setIsFrameworkExpanded(true)}
                                     onConvertToOutline={handleConvertFrameworkToOutline}
+                                    renderAiMarkdown={renderAiMarkdown}
+                                    setActiveCitationSource={setActiveCitationSource}
                                 />
                             ) : (
                                 <>

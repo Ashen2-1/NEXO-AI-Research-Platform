@@ -129,6 +129,7 @@ function FrameworkPanel({
     onClose,
     onExpand,
     onConvertToOutline,
+    renderAiMarkdown,
 }) {
     const frameworkEditorRef = useRef(null);
 
@@ -539,7 +540,21 @@ function FrameworkPanel({
                                 ↶
                             </button>
                         </div>
-                        
+                        {renderAiMarkdown &&
+                            currentFramework?.citationSources?.length > 0 && (
+                                <div className="Framework_Citation_Preview">
+                                    <div className="Framework_Citation_Preview_Header">
+                                        Evidence-linked Preview
+                                    </div>
+
+                                    <div className="Framework_Citation_Preview_Body">
+                                        {renderAiMarkdown(
+                                            frameworkEditorDraft,
+                                            currentFramework.citationSources || []
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         <div
                             ref={frameworkEditorRef}
                             className="Framework_Editor_Content"
