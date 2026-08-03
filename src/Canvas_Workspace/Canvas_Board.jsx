@@ -30,6 +30,76 @@ const FRAMEWORK_STORAGE_SOURCE = "__nexo_framework__";
 const OUTLINE_STORAGE_SOURCE = "__nexo_outline__";
 const HISTORY_LIMIT = 50;
 
+const EMPTY_INLINE_FORMAT_STATE = {
+    bold: false,
+    italic: false,
+    underline: false,
+};
+
+const getInlineFormatState = (editor) => {
+    const selection = window.getSelection();
+
+    const selectionIsInsideEditor =
+        editor &&
+        selection &&
+        selection.rangeCount > 0 &&
+        selection.anchorNode &&
+        selection.focusNode &&
+        editor.contains(selection.anchorNode) &&
+        editor.contains(selection.focusNode);
+
+    if (!selectionIsInsideEditor) {
+        return {
+            ...EMPTY_INLINE_FORMAT_STATE,
+        };
+    }
+
+    try {
+        return {
+            bold:
+                document.queryCommandState(
+                    "bold"
+                ),
+
+            italic:
+                document.queryCommandState(
+                    "italic"
+                ),
+
+            underline:
+                document.queryCommandState(
+                    "underline"
+                ),
+        };
+    } catch (error) {
+        return {
+            ...EMPTY_INLINE_FORMAT_STATE,
+        };
+    }
+};
+
+const syncInlineFormatState = (
+    editor,
+    setFormatState
+) => {
+    const nextState =
+        getInlineFormatState(editor);
+
+    setFormatState((previousState) => {
+        const didNotChange =
+            previousState.bold ===
+                nextState.bold &&
+            previousState.italic ===
+                nextState.italic &&
+            previousState.underline ===
+                nextState.underline;
+
+        return didNotChange
+            ? previousState
+            : nextState;
+    });
+};
+
 const getUploadedSourceType = (
     fileName = "",
     backendSourceType = ""
@@ -198,10 +268,20 @@ function CanvasBoard(){
     const [hoveredNoteId, setHoveredNoteId] = useState(null);
     const [openedNoteId, setOpenedNoteId] = useState(null);
     const [noteDraft, setNoteDraft] = useState("");
+
+    const [
+        noteFormatState,
+        setNoteFormatState,
+    ] = useState(() => ({
+        ...EMPTY_INLINE_FORMAT_STATE,
+    }));
+
     const editorRef = useRef(null);
     const chatBottomRef = useRef(null);
     const expandedFrameworkEditorRef = useRef(null);
     const [activeCitationSource, setActiveCitationSource] = useState(null);
+
+    const previewCloseTimerRef = useRef(null);
 
     const [activeToolMode, setActiveToolMode] = useState("canvas");
 
@@ -227,6 +307,14 @@ function CanvasBoard(){
     const [frameworkVersions, setFrameworkVersions] = useState([]);
     const [isFrameworkExpanded, setIsFrameworkExpanded] = useState(false);
     const [frameworkEditorDraft, setFrameworkEditorDraft] = useState("");
+
+    const [
+        expandedFrameworkFormatState,
+        setExpandedFrameworkFormatState,
+    ] = useState(() => ({
+        ...EMPTY_INLINE_FORMAT_STATE,
+    }));
+
     const [frameworkSaveStatus, setFrameworkSaveStatus] = useState("saved");
     const [frameworkGenerationError, setFrameworkGenerationError] = useState("");
     const [frameworkRefinementPrompt, setFrameworkRefinementPrompt] = useState("");
@@ -871,6 +959,33 @@ function CanvasBoard(){
     
             return false;
         }
+    };
+
+    const cancelPreviewClose = () => {
+        if (
+            previewCloseTimerRef.current !== null
+        ) {
+            window.clearTimeout(
+                previewCloseTimerRef.current
+            );
+    
+            previewCloseTimerRef.current = null;
+        }
+    };
+    
+    const handlePreviewEnter = (noteId) => {
+        cancelPreviewClose();
+        setHoveredNoteId(noteId);
+    };
+    
+    const handlePreviewLeave = () => {
+        cancelPreviewClose();
+    
+        previewCloseTimerRef.current =
+            window.setTimeout(() => {
+                setHoveredNoteId(null);
+                previewCloseTimerRef.current = null;
+            }, 220);
     };
 
     /** When file upload success it will be package in the way we want so later can put into the PGSQL*/
@@ -2559,19 +2674,36 @@ function CanvasBoard(){
         command,
         value = null
     ) => {
-        if (!openedNote || openedNote.locked) {
+        if (
+            !openedNote ||
+            openedNote.locked
+        ) {
             return;
         }
     
-        if (editorRef.current) {
-            editorRef.current.focus();
+        const editor =
+            editorRef.current;
+    
+        if (!editor) {
+            return;
         }
     
-        document.execCommand(command, false, value);
+        editor.focus();
     
-        if (editorRef.current) {
-            setNoteDraft(editorRef.current.innerHTML);
-        }
+        document.execCommand(
+            command,
+            false,
+            value
+        );
+    
+        setNoteDraft(
+            editor.innerHTML
+        );
+    
+        syncInlineFormatState(
+            editor,
+            setNoteFormatState
+        );
     };
     /***************************************************************************/  
     const handleNoteToolbarCommand = (
@@ -2625,6 +2757,11 @@ function CanvasBoard(){
     
             setNoteDraft(
                 editorRef.current.innerHTML
+            );
+
+            syncInlineFormatState(
+                editorRef.current,
+                setNoteFormatState
             );
         });
     };
@@ -2686,16 +2823,29 @@ function CanvasBoard(){
     ) => {
         event.preventDefault();
     
-        const editor = expandedFrameworkEditorRef.current;
+        const editor =
+            expandedFrameworkEditorRef.current;
     
         if (!editor) {
             return;
         }
     
         editor.focus();
-        document.execCommand(command, false, value);
     
-        setFrameworkEditorDraft(editor.innerHTML);
+        document.execCommand(
+            command,
+            false,
+            value
+        );
+    
+        setFrameworkEditorDraft(
+            editor.innerHTML
+        );
+    
+        syncInlineFormatState(
+            editor,
+            setExpandedFrameworkFormatState
+        );
     };
     /***************************************************************************/
     const convertDatabaseNoteToCanvasNote = (note) => {
@@ -3654,7 +3804,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
         }
     
         const nextHtml =
-            /<\/?(p|div|br|strong|b|em|i|ul|ol|li|h[1-6]|blockquote|pre)\b/i.test(
+            /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|h[1-6]|blockquote|pre)\b/i.test(
                 frameworkEditorDraft
             )
                 ? frameworkEditorDraft
@@ -3683,6 +3833,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
             if (zoomHistoryTimerRef.current) {
                 window.clearTimeout(
                     zoomHistoryTimerRef.current
+                );
+            }
+
+            if (
+                previewCloseTimerRef.current !== null
+            ) {
+                window.clearTimeout(
+                    previewCloseTimerRef.current
                 );
             }
         };
@@ -3797,6 +3955,85 @@ ${frameworkEditorDraft.slice(0, 60000)}
             setNoteDraft(openedNote.userNote || "");
         }
     }, [openedNoteId]);
+    /***************************************************************************/
+    useEffect(() => {
+        if (openedNoteId === null) {
+            setNoteFormatState({
+                ...EMPTY_INLINE_FORMAT_STATE,
+            });
+    
+            return;
+        }
+    
+        const handleSelectionChange = () => {
+            syncInlineFormatState(
+                editorRef.current,
+                setNoteFormatState
+            );
+        };
+    
+        document.addEventListener(
+            "selectionchange",
+            handleSelectionChange
+        );
+    
+        const frameId =
+            window.requestAnimationFrame(
+                handleSelectionChange
+            );
+    
+        return () => {
+            window.cancelAnimationFrame(
+                frameId
+            );
+    
+            document.removeEventListener(
+                "selectionchange",
+                handleSelectionChange
+            );
+        };
+    }, [openedNoteId]);
+    /***************************************************************************/
+    useEffect(() => {
+        if (!isFrameworkExpanded) {
+            setExpandedFrameworkFormatState({
+                ...EMPTY_INLINE_FORMAT_STATE,
+            });
+    
+            return;
+        }
+    
+        const handleSelectionChange = () => {
+            syncInlineFormatState(
+                expandedFrameworkEditorRef.current,
+                setExpandedFrameworkFormatState
+            );
+        };
+    
+        document.addEventListener(
+            "selectionchange",
+            handleSelectionChange
+        );
+    
+        const frameId =
+            window.requestAnimationFrame(
+                handleSelectionChange
+            );
+    
+        return () => {
+            window.cancelAnimationFrame(
+                frameId
+            );
+    
+            document.removeEventListener(
+                "selectionchange",
+                handleSelectionChange
+            );
+        };
+    }, [
+        isFrameworkExpanded,
+        currentFramework?.id,
+    ]);
     /***************************************************************************/
     useEffect(() => {
         chatBottomRef.current?.scrollIntoView({
@@ -4505,6 +4742,10 @@ ${frameworkEditorDraft.slice(0, 60000)}
     };
 
     const handlePrepareAiToolPrompt = (promptText) => {
+        // 点击其他 Research Tool 时关闭 Framework
+        setIsFrameworkExpanded(false);
+        setIsFrameworkPanelOpen(false);
+    
         setChatInput(promptText);
         setIsChatOpen(true);
     };
@@ -4548,6 +4789,57 @@ ${frameworkEditorDraft.slice(0, 60000)}
     const handleOpenSettings = () => {
         alert("Settings will be added later.");
     };
+
+    const handleSelectAll = () => {
+        const visibleIds = new Set(
+            visibleNotes.map((note) =>
+                String(note.id)
+            )
+        );
+    
+        setNotes((prevNotes) =>
+            prevNotes.map((note) =>
+                visibleIds.has(String(note.id))
+                    ? {
+                          ...note,
+                          selected: true,
+                      }
+                    : note
+            )
+        );
+    };
+    
+    const handleInvertSelection = () => {
+        const visibleIds = new Set(
+            visibleNotes.map((note) =>
+                String(note.id)
+            )
+        );
+    
+        setNotes((prevNotes) =>
+            prevNotes.map((note) =>
+                visibleIds.has(String(note.id))
+                    ? {
+                          ...note,
+                          selected: !note.selected,
+                      }
+                    : note
+            )
+        );
+    };
+    
+    const handleDeselectAll = () => {
+        setNotes((prevNotes) =>
+            prevNotes.map((note) =>
+                note.selected
+                    ? {
+                          ...note,
+                          selected: false,
+                      }
+                    : note
+            )
+        );
+    };
     /***************************************************************************/
     return (
         <div className="Canvas_Page">
@@ -4574,6 +4866,20 @@ ${frameworkEditorDraft.slice(0, 60000)}
                 onAutoArrange={handleAutoArrange}
                 onLockSelected={handleLockSelected}
                 onPinTop={handlePinTop}
+
+                onSelectAll={handleSelectAll}
+                onInvertSelection={handleInvertSelection}
+                onDeselectAll={handleDeselectAll}
+
+                canSelectAll={visibleNotes.some(
+                    (note) => !note.selected
+                )}
+                canInvertSelection={
+                    visibleNotes.length > 0
+                }
+                canDeselectAll={notes.some(
+                    (note) => note.selected
+                )}
 
                 sourceSearchQuery={sourceSearchQuery}
 
@@ -4607,7 +4913,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                     {isCabinetOpen && (
                         <>
                             <div className="Cabinet_Header">
-                                <h2>CABINTE</h2>
+                                <h2>CABINET</h2>
                                 <button className="Cabinet_Add_Button" onClick={()=>setShowUploadModal(true)}>+</button>
                             </div>
 
@@ -4689,7 +4995,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     setHoveredNoteId(note.id)
                                 }
                                 onMouseLeave={() =>
-                                    setHoveredNoteId(null)
+                                    handlePreviewLeave
                                 }
                                 onClick={() => {
                                     if (!hasDraggedNote) {
@@ -4773,7 +5079,21 @@ ${frameworkEditorDraft.slice(0, 60000)}
                         ))}
 
                         {hoveredNote && (
-                            <div className="Note_Preview_Card" style={{left: `${hoveredNote.x + NOTE_WIDTH + 8}px`, top: `${hoveredNote.y}px`}} onMouseEnter={() => setHoveredNoteId(hoveredNote.id)} onMouseLeave={() => setHoveredNoteId(null)}>
+                            <div
+                                className="Note_Preview_Card"
+                                style={{
+                                    left: `${hoveredNote.x + NOTE_WIDTH + 8}px`,
+                                    top: `${hoveredNote.y}px`,
+                                }}
+                                onMouseEnter={() =>
+                                    handlePreviewEnter(
+                                        hoveredNote.id
+                                    )
+                                }
+                                onMouseLeave={
+                                    handlePreviewLeave
+                                }
+                            >
                                 <p className="Note_Preview_Label">
                                     {hoveredNote.noteKind === "outline" ? "OUTLINE" : "PAPER"}
                                 </p>
@@ -4799,7 +5119,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     }
                                 </p>
 
-                                <button className="Note_Preview_Button" onClick={() => handleOpenNote(hoveredNote)}>
+                                <button
+                                    className="Note_Preview_Button"
+                                    onClick={() => {
+                                        cancelPreviewClose();
+                                        setHoveredNoteId(null);
+                                        handleOpenNote(hoveredNote);
+                                    }}
+                                >
                                     OPEN NOTE
                                 </button>
                             </div>
@@ -5129,6 +5456,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                         <button
                                             type="button"
                                             title="Bold"
+                                            className={
+                                                noteFormatState.bold
+                                                    ? "Format_Button_Active"
+                                                    : ""
+                                            }
+                                            aria-pressed={
+                                                noteFormatState.bold
+                                            }
                                             onMouseDown={(event) =>
                                                 handleNoteToolbarCommand(
                                                     event,
@@ -5142,6 +5477,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                         <button
                                             type="button"
                                             title="Italic"
+                                            className={
+                                                noteFormatState.italic
+                                                    ? "Format_Button_Active"
+                                                    : ""
+                                            }
+                                            aria-pressed={
+                                                noteFormatState.italic
+                                            }
                                             onMouseDown={(event) =>
                                                 handleNoteToolbarCommand(
                                                     event,
@@ -5155,6 +5498,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                         <button
                                             type="button"
                                             title="Underline"
+                                            className={
+                                                noteFormatState.underline
+                                                    ? "Format_Button_Active"
+                                                    : ""
+                                            }
+                                            aria-pressed={
+                                                noteFormatState.underline
+                                            }
                                             onMouseDown={(event) =>
                                                 handleNoteToolbarCommand(
                                                     event,
@@ -5247,12 +5598,42 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                         contentEditable={!openedNote.locked}
                                         suppressContentEditableWarning
                                         suppressHydrationWarning
+
                                         onInput={(event) => {
                                             setNoteDraft(
                                                 event.currentTarget.innerHTML
                                             );
+
+                                            syncInlineFormatState(
+                                                event.currentTarget,
+                                                setNoteFormatState
+                                            );
                                         }}
-                                        onKeyDown={handleNoteEditorKeyDown}
+
+                                        onMouseUp={() =>
+                                            syncInlineFormatState(
+                                                editorRef.current,
+                                                setNoteFormatState
+                                            )
+                                        }
+
+                                        onKeyUp={() =>
+                                            syncInlineFormatState(
+                                                editorRef.current,
+                                                setNoteFormatState
+                                            )
+                                        }
+
+                                        onFocus={() =>
+                                            syncInlineFormatState(
+                                                editorRef.current,
+                                                setNoteFormatState
+                                            )
+                                        }
+
+                                        onKeyDown={
+                                            handleNoteEditorKeyDown
+                                        }
                                     />
                                 </div>
                             </div>
@@ -5334,6 +5715,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
 
                                 <button
                                     type="button"
+                                    className={
+                                        expandedFrameworkFormatState.bold
+                                            ? "Format_Button_Active"
+                                            : ""
+                                    }
+                                    aria-pressed={
+                                        expandedFrameworkFormatState.bold
+                                    }
                                     onMouseDown={(event) =>
                                         handleExpandedFrameworkCommand(
                                             event,
@@ -5346,6 +5735,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
 
                                 <button
                                     type="button"
+                                    className={
+                                        expandedFrameworkFormatState.italic
+                                            ? "Format_Button_Active"
+                                            : ""
+                                    }
+                                    aria-pressed={
+                                        expandedFrameworkFormatState.italic
+                                    }
                                     onMouseDown={(event) =>
                                         handleExpandedFrameworkCommand(
                                             event,
@@ -5354,6 +5751,26 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     }
                                 >
                                     <i>I</i>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        expandedFrameworkFormatState.underline
+                                            ? "Format_Button_Active"
+                                            : ""
+                                    }
+                                    aria-pressed={
+                                        expandedFrameworkFormatState.underline
+                                    }
+                                    onMouseDown={(event) =>
+                                        handleExpandedFrameworkCommand(
+                                            event,
+                                            "underline"
+                                        )
+                                    }
+                                >
+                                    <u>U</u>
                                 </button>
 
                                 <button type="button">Comment</button>
@@ -5365,9 +5782,35 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                 contentEditable
                                 suppressContentEditableWarning
                                 data-placeholder="Framework content will appear here..."
-                                onInput={(event) =>
+                                onInput={(event) => {
                                     setFrameworkEditorDraft(
                                         event.currentTarget.innerHTML
+                                    );
+                                
+                                    syncInlineFormatState(
+                                        event.currentTarget,
+                                        setExpandedFrameworkFormatState
+                                    );
+                                }}
+                                
+                                onMouseUp={() =>
+                                    syncInlineFormatState(
+                                        expandedFrameworkEditorRef.current,
+                                        setExpandedFrameworkFormatState
+                                    )
+                                }
+                                
+                                onKeyUp={() =>
+                                    syncInlineFormatState(
+                                        expandedFrameworkEditorRef.current,
+                                        setExpandedFrameworkFormatState
+                                    )
+                                }
+                                
+                                onFocus={() =>
+                                    syncInlineFormatState(
+                                        expandedFrameworkEditorRef.current,
+                                        setExpandedFrameworkFormatState
                                     )
                                 }
                             />

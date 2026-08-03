@@ -467,3 +467,25 @@
         height: 36px;
     }
 }
+
+.Framework_Mini_Toolbar button {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    flex: 0 0 28px;
+    box-sizing: border-box;
+}
+
+.Framework_Mini_Toolbar button.Format_Button_Active,
+.Framework_Mini_Toolbar button.Format_Button_Active:hover {
+    background-color: #d6d6d6;
+    color: #111111;
+    border-color: #b8b8b8;
+    border-radius: 8px;
+    box-shadow: none;
+}
