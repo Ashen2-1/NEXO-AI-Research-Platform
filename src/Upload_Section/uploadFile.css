@@ -407,3 +407,16 @@
         text-align: center;
     }
 }
+
+.upload-file-list {
+  margin: 6px 0 0 0;
+  padding-left: 18px;
+  max-height: 70px;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.upload-file-list li {
+  font-size: 12px;
+  color: #444;
+}

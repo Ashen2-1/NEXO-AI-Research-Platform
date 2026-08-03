@@ -879,6 +879,13 @@ function CanvasBoard(){
         uploadedFile,
         uploadResult
     ) => {
+        if (uploadResult?.success === false) {
+            alert(
+                `${uploadedFile.name} failed to upload or index.\n` +
+                `${uploadResult.error || ""}`
+            );
+            return;
+        }
         const sourceType =
             getUploadedSourceType(
                 uploadedFile.name,
@@ -933,56 +940,31 @@ function CanvasBoard(){
                   : `${sourceDescription} uploaded successfully. Open the original file to view its contents.`;
 
         const newNoteData = {
-            title:
-                uploadedFile.name,
-
+            title: uploadedFile.name,
             body: noteBody,
-
             user_note: "",
+            x: 260 + notes.length * 35,
+            y: 120 + notes.length * 35,
 
-            x:
-                260 +
-                notes.length *
-                    35,
-
-            y:
-                120 +
-                notes.length *
-                    35,
-
-            source_type:
-                sourceType,
-
+            source_type: sourceType,
             source_name:
-                uploadResult
-                    ?.file ||
-                uploadResult
-                    ?.originalName ||
+                uploadResult?.file ||
+                uploadResult?.originalName ||
                 uploadedFile.name,
 
-            file_url:
-                uploadResult
-                    ?.fileUrl ||
-                "",
-
-            file_size:
-                uploadResult
-                    ?.fileSize ??
-                uploadedFile.size,
-
+            file_url: uploadResult?.fileUrl || "",
+            file_size: uploadResult?.fileSize ?? uploadedFile.size,
             chunks_added:
-                uploadResult
-                    ?.chunks_added ??
-                uploadResult
-                    ?.chunksAdded ??
+                uploadResult?.chunks_added ??
+                uploadResult?.chunksAdded ??
                 null,
 
             db_total:
-                uploadResult
-                    ?.db_total ??
-                uploadResult
-                    ?.dbTotal ??
+                uploadResult?.db_total ??
+                uploadResult?.dbTotal ??
                 null,
+
+            ingest_status: uploadResult?.ingested ? "indexed" : "uploaded",
         };
 
         try {
@@ -2673,6 +2655,7 @@ function CanvasBoard(){
     
             createdAt: note.created_at,
             updatedAt: note.updated_at,
+            ingestStatus: note.ingest_status || note.ingestStatus || "indexed",
         };
     };
     /***************************************************************************/
@@ -4675,8 +4658,11 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                 </p>
 
                                 <p className="Canvas_Note_Meta">
-                                    {getCanvasNoteTypeLabel(
-                                        note.noteKind
+                                    {getCanvasNoteTypeLabel(note.sourceType)}
+                                    {note.ingestStatus && (
+                                        <span className={`Canvas_Note_Status Status_${note.ingestStatus}`}>
+                                            {note.ingestStatus}
+                                        </span>
                                     )}
                                 </p>
 

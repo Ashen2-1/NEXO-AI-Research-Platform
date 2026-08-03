@@ -11,12 +11,10 @@ function UploadFile({ showModal, onClose, onUploadSuccess}) {
 
   const fileInputRef = useRef(null);
 
-  const [fileName, setFileName] = useState("");
-  const [file, setFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
 
   const clearFile = () => {
-    setFileName("");
-    setFile(null);
+    setSelectedFiles([]);
     setProgress(0);
     setIsUploading(false);
 
@@ -106,9 +104,15 @@ const getFileExtension = (
   };
 
   const getFileIcon = () => {
-    if (!fileName) return "↥";
+    if (selectedFiles.length === 0) {
+      return "↥";
+    }
 
-    const ext = fileName.split(".").pop().toLowerCase();
+    if (selectedFiles.length > 1) {
+      return "📚";
+    }
+
+    const ext = getFileExtension(selectedFiles[0]);
 
     if (ext === "pdf") return "📄";
     if (ext === "doc" || ext === "docx") return "📝";
@@ -123,26 +127,22 @@ const getFileExtension = (
   };
 
   const handleFileSelect = (event) => {
-    const selectedFile = event.target.files[0];
-    if (!selectedFile) return;
+    const files = Array.from(event.target.files || []);
 
-    if (validateFile(selectedFile)) {
-      setFileName(selectedFile.name);
-      setFile(selectedFile);
-    }
+    const validFiles = files.filter((file) => validateFile(file));
+
+    setSelectedFiles(validFiles);
   };
 
   const handleDrop = (event) => {
     event.preventDefault();
     setDragging(false);
 
-    const droppedFile = event.dataTransfer.files[0];
-    if (!droppedFile) return;
+    const droppedFiles = Array.from(event.dataTransfer.files || []);
 
-    if (validateFile(droppedFile)) {
-      setFileName(droppedFile.name);
-      setFile(droppedFile);
-    }
+    const validFiles = droppedFiles.filter((file) => validateFile(file));
+
+    setSelectedFiles(validFiles);
   };
 
   const handleDragOver = (event) => {
@@ -154,116 +154,113 @@ const getFileExtension = (
     setDragging(false);
   };
 
+  const uploadSingleFile = (fileToUpload, fileIndex, totalFiles) => {
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+
+      const xhr = new XMLHttpRequest();
+
+      xhr.open("POST", buildApiUrl("/files/ingest"));
+
+      const token = localStorage.getItem("nexo_token");
+
+      if (token) {
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      }
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const singleFilePercent = event.loaded / event.total;
+          const totalPercent = Math.round(
+            ((fileIndex + singleFilePercent) / totalFiles) * 100
+          );
+
+          setProgress(totalPercent);
+        }
+      };
+
+      xhr.onload = () => {
+        let responseData = null;
+
+        try {
+          responseData = JSON.parse(xhr.responseText);
+        } catch {
+          responseData = {
+            error: xhr.responseText || "Invalid upload response",
+          };
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(responseData);
+        } else {
+          reject(
+            new Error(
+              responseData?.error ||
+              responseData?.detail ||
+              `Upload failed with status ${xhr.status}`
+            )
+          );
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error("Network error while uploading file"));
+      };
+
+      xhr.send(formData);
+    });
+  };
+
   const uploadToBackend = async () => {
     if (isUploading) {
       return;
     }
 
-    if (!file) {
+    if (selectedFiles.length === 0) {
       alert("No file selected");
       return;
     }
 
     setIsUploading(true);
-    setProgress(1);
 
-    const formData = new FormData();
-    formData.append("file", file);
+    const totalFiles = selectedFiles.length;
+    const uploadedResults = [];
 
-    const xhr = new XMLHttpRequest();
+    for (let index = 0; index < selectedFiles.length; index++) {
+      const currentFile = selectedFiles[index];
 
-    xhr.open("POST", buildApiUrl("/files/ingest"));
+      const fileBaseProgress = Math.round((index / totalFiles) * 100);
+      setProgress(fileBaseProgress);
 
-    const token = localStorage.getItem("nexo_token");
+      try {
+        const result = await uploadSingleFile(currentFile, index, totalFiles);
 
-    if (token) {
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        uploadedResults.push({
+          file: currentFile,
+          result,
+        });
+
+        if (onUploadSuccess) {
+          onUploadSuccess(currentFile, result);
+        }
+      } catch (error) {
+        console.error("Upload failed:", currentFile.name, error);
+
+        if (onUploadSuccess) {
+          onUploadSuccess(currentFile, {
+            file: currentFile.name,
+            success: false,
+            error: error.message || "Upload failed",
+          });
+        }
+      }
     }
 
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        setProgress(percent);
-      }
-    };
+    setIsUploading(false);
+    setProgress(100);
 
-    xhr.onload = async () => {
-      let responseData = {};
-    
-      try {
-        responseData =
-          JSON.parse(
-            xhr.responseText ||
-              "{}"
-          );
-      } catch (error) {
-        console.error(
-          "Failed to parse upload response:",
-          error
-        );
-      }
-    
-      if (
-        xhr.status >= 200 &&
-        xhr.status < 300
-      ) {
-        setProgress(100);
-    
-        try {
-          await onUploadSuccess?.(
-            file,
-            responseData
-          );
-    
-          setIsUploading(false);
-    
-          /*
-            forceClose avoids the old
-            isUploading state closure.
-          */
-          closeModal(true);
-        } catch (error) {
-          console.error(
-            "Upload success callback failed:",
-            error
-          );
-    
-          setIsUploading(false);
-    
-          alert(
-            "The file uploaded, but the Canvas note could not be created."
-          );
-        }
-    
-        return;
-      }
-    
-      setIsUploading(false);
-      setProgress(0);
-    
-      console.error("Upload failed:", xhr.status, xhr.responseText);
-
-      let message = "Upload failed";
-
-      try {
-        const errorData = JSON.parse(xhr.responseText);
-        message = errorData.error || errorData.detail || message;
-      } catch {
-        if (xhr.responseText) {
-          message = xhr.responseText;
-        }
-      }
-
-      alert(message);
-    };
-
-    xhr.onerror = () => {
-      setIsUploading(false);
-      console.error("Upload failed");
-      alert("Upload failed");
-    };
-
-    xhr.send(formData);
+    closeModal(true);
   };
 
   if (!showModal) {
@@ -282,7 +279,7 @@ const getFileExtension = (
 
             <button
               className="upload-close-btn"
-              onClick={closeModal}
+              onClick={() => closeModal()}
               aria-label="Close"
               disabled={isUploading}
             >
@@ -311,8 +308,17 @@ const getFileExtension = (
               PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX (Max 10MB)
             </div>
 
-            {fileName && (
-              <div className="upload-file-name">Selected file: {fileName}</div>
+            {selectedFiles.length > 0 && (
+              <div className="upload-file-name">
+                {selectedFiles.length} file(s) selected:
+                <ul className="upload-file-list">
+                  {selectedFiles.map((file) => (
+                    <li key={`${file.name}-${file.size}`}>
+                      {file.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {progress > 0 && (
@@ -326,34 +332,26 @@ const getFileExtension = (
           </div>
 
           <div className="upload-footer">
-            <button className="upload-cancel-btn" onClick={closeModal} disabled={isUploading}>
+            <button className="upload-cancel-btn" onClick={() => closeModal()} disabled={isUploading}>
               Cancel
             </button>
 
             <button
-              type="button"
               className="upload-done-btn"
               onClick={uploadToBackend}
-              disabled={
-                isUploading || !file
-              }
+              disabled={isUploading || selectedFiles.length === 0}
             >
-              {isUploading
-                ? "Uploading..."
-                : "Done"}
+              {isUploading ? "Uploading..." : "Done"}
             </button>
           </div>
 
           <input
             type="file"
-            ref={fileInputRef}
+            multiple
             accept={acceptedFileTypes}
-            style={{
-              display: "none",
-            }}
-            onChange={
-              handleFileSelect
-            }
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            onChange={handleFileSelect}
           />
         </div>
       </div>

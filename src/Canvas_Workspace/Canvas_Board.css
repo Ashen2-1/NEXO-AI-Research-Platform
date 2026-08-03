@@ -2000,3 +2000,31 @@ body,
     font-size: 11px;
     color: #999999;
 }
+
+/**Canvas Not Statuation********/
+.Canvas_Note_Status {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    font-size: 9px;
+    text-transform: uppercase;
+    background: #eeeeee;
+    color: #666666;
+}
+
+.Status_indexed {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.Status_uploaded,
+.Status_indexing {
+    background: #fff8e1;
+    color: #8a6d00;
+}
+
+.Status_failed {
+    background: #ffebee;
+    color: #c62828;
+}
