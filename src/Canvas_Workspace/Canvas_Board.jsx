@@ -1672,13 +1672,21 @@ function CanvasBoard(){
         });
     };
 
-    const renderChildrenWithCitations = (children, sources = [], onCitationClick = setActiveCitationSource) => {
+    const renderChildrenWithCitations = (
+        children,
+        sources = [],
+        onCitationClick = setActiveCitationSource
+    ) => {
         return React.Children.map(children, (child) => {
             if (typeof child === "string") {
-                return renderTextWithCitations(child, sources);
+                return renderTextWithCitations(
+                    child,
+                    sources,
+                    onCitationClick
+                );
             }
 
-            return renderTextWithCitations(child, sources, onCitationClick);
+            return child;
         });
     };
 
