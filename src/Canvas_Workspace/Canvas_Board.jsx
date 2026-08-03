@@ -4340,6 +4340,57 @@ ${frameworkEditorDraft.slice(0, 60000)}
     const handleOpenSettings = () => {
         alert("Settings will be added later.");
     };
+
+    const handleSelectAll = () => {
+        const visibleIds = new Set(
+            visibleNotes.map((note) =>
+                String(note.id)
+            )
+        );
+    
+        setNotes((prevNotes) =>
+            prevNotes.map((note) =>
+                visibleIds.has(String(note.id))
+                    ? {
+                          ...note,
+                          selected: true,
+                      }
+                    : note
+            )
+        );
+    };
+    
+    const handleInvertSelection = () => {
+        const visibleIds = new Set(
+            visibleNotes.map((note) =>
+                String(note.id)
+            )
+        );
+    
+        setNotes((prevNotes) =>
+            prevNotes.map((note) =>
+                visibleIds.has(String(note.id))
+                    ? {
+                          ...note,
+                          selected: !note.selected,
+                      }
+                    : note
+            )
+        );
+    };
+    
+    const handleDeselectAll = () => {
+        setNotes((prevNotes) =>
+            prevNotes.map((note) =>
+                note.selected
+                    ? {
+                          ...note,
+                          selected: false,
+                      }
+                    : note
+            )
+        );
+    };
     /***************************************************************************/
     return (
         <div className="Canvas_Page">
@@ -4366,6 +4417,20 @@ ${frameworkEditorDraft.slice(0, 60000)}
                 onAutoArrange={handleAutoArrange}
                 onLockSelected={handleLockSelected}
                 onPinTop={handlePinTop}
+
+                onSelectAll={handleSelectAll}
+                onInvertSelection={handleInvertSelection}
+                onDeselectAll={handleDeselectAll}
+
+                canSelectAll={visibleNotes.some(
+                    (note) => !note.selected
+                )}
+                canInvertSelection={
+                    visibleNotes.length > 0
+                }
+                canDeselectAll={notes.some(
+                    (note) => note.selected
+                )}
 
                 sourceSearchQuery={sourceSearchQuery}
 

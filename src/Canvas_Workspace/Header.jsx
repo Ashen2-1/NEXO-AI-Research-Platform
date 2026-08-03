@@ -25,6 +25,14 @@ function Header({
     onLockSelected,
     onPinTop,
 
+    onSelectAll,
+    onInvertSelection,
+    onDeselectAll,
+
+    canSelectAll = false,
+    canInvertSelection = false,
+    canDeselectAll = false,
+
     sourceSearchQuery = "",
 
     onSearchSources,
@@ -132,6 +140,35 @@ function Header({
                             <button type="button" onClick={onAutoArrange}>☷ Auto Arrange</button>
                             <button type="button" onClick={onLockSelected}>🔒 Lock</button>
                             <button type="button" onClick={onPinTop}>↗ Pin Top</button>
+
+                            <div className="Header_Selection_Group">
+                                <button
+                                    type="button"
+                                    onClick={onSelectAll}
+                                    disabled={!canSelectAll}
+                                    title="Selects all selectable notes or objects in the current workspace context."
+                                >
+                                    ▧ Select All
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={onInvertSelection}
+                                    disabled={!canInvertSelection}
+                                    title="Switches the selection: selected items become unselected, and unselected items become selected."
+                                >
+                                    ◎ Invert
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={onDeselectAll}
+                                    disabled={!canDeselectAll}
+                                    title="Clears the current selection only. It does not delete notes or clear the canvas."
+                                >
+                                    ⊘ Deselect All
+                                </button>
+                            </div>
                         </>
                     )}
 

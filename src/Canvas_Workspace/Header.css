@@ -82,6 +82,16 @@
     color: #ffffff;
 }
 
+.Header_Selection_Group {
+    margin-left: auto;
+
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    flex-shrink: 0;
+}
+
 .Header_Action_Group {
     display: flex;
     align-items: center;
@@ -118,7 +128,9 @@
     display: flex;
     align-items: center;
     gap: 7px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .Header_Tool_Row button {
@@ -192,6 +204,16 @@
     }
 
     .Header_Action_Group {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .Header_Right_Controls {
+        justify-self: start;
+        align-items: flex-start;
+    }
+    
+    .Header_Selection_Group {
         justify-content: flex-start;
         flex-wrap: wrap;
     }
