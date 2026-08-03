@@ -4297,6 +4297,10 @@ ${frameworkEditorDraft.slice(0, 60000)}
     };
 
     const handlePrepareAiToolPrompt = (promptText) => {
+        // 点击其他 Research Tool 时关闭 Framework
+        setIsFrameworkExpanded(false);
+        setIsFrameworkPanelOpen(false);
+    
         setChatInput(promptText);
         setIsChatOpen(true);
     };
