@@ -1506,6 +1506,24 @@ function CanvasBoard(){
         (note) => note.id === openedNoteId
     );
     /***************************************************************************/
+    const getReadableEvidenceText = (source) => {
+        const rawText = String(
+            source?.text ||
+            source?.preview ||
+            "No preview available."
+        );
+
+        return rawText
+            .replace(/\(cid:\d+\)/g, " ")
+            .replace(/\x00/g, " ")
+            .replace(/([a-z])([A-Z])/g, "$1 $2")
+            .replace(/([.!?])([A-Z])/g, "$1 $2")
+            .replace(/[ \t]+/g, " ")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+    };
+
+
     const handleSendMessage = async () => {
 
         if (isAiThinking) {
@@ -5365,7 +5383,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                                     remarkPlugins={[remarkGfm, remarkMath]}
                                                     rehypePlugins={[rehypeKatex]}
                                                 >
-                                                    {activeCitationSource.text || activeCitationSource.preview || "No preview available."}
+                                                    {getReadableEvidenceText(activeCitationSource)}
                                                 </ReactMarkdown>
                                             </div>
                                         </div>
