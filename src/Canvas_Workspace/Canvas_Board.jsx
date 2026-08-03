@@ -4856,38 +4856,38 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                                         </div>
                                                     </div>
                                                 )}
-                                                {activeCitationSource && (
-                                                    <div className="Citation_Preview_Card">
-                                                        <div className="Citation_Preview_Header">
-                                                            <div>
-                                                                <p>Source Evidence</p>
-                                                                <h3>{activeCitationSource.file || "Source"}</h3>
-                                                                <span>Chunk {activeCitationSource.chunk || ""}</span>
-                                                            </div>
-
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setActiveCitationSource(null)}
-                                                            >
-                                                                ×
-                                                            </button>
-                                                        </div>
-
-                                                        <div className="Citation_Preview_Body">
-                                                            <ReactMarkdown
-                                                                remarkPlugins={[remarkGfm, remarkMath]}
-                                                                rehypePlugins={[rehypeKatex]}
-                                                            >
-                                                                {activeCitationSource.text || activeCitationSource.preview || "No preview available."}
-                                                            </ReactMarkdown>
-                                                        </div>
-                                                    </div>
-                                                )}
+                                                
                                                 <div ref={chatBottomRef} />
                                             </div>
                                         )}
                                     </div>
+                                    {activeCitationSource && (
+                                        <div className="Citation_Preview_Card">
+                                            <div className="Citation_Preview_Header">
+                                                <div>
+                                                    <p>Source Evidence</p>
+                                                    <h3>{activeCitationSource.file || "Source"}</h3>
+                                                    <span>Chunk {activeCitationSource.chunk || ""}</span>
+                                                </div>
 
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveCitationSource(null)}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+
+                                            <div className="Citation_Preview_Body">
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm, remarkMath]}
+                                                    rehypePlugins={[rehypeKatex]}
+                                                >
+                                                    {activeCitationSource.text || activeCitationSource.preview || "No preview available."}
+                                                </ReactMarkdown>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="Chat_Input_Bar">
                                         <input
                                             className="Chat_Input"
