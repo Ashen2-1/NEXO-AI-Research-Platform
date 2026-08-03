@@ -20,6 +20,10 @@ import { IoLinkSharp } from "react-icons/io5";
 import { MdDelete } from "react-icons/md";
 import { FaListUl } from "react-icons/fa";
 import { FaListOl } from "react-icons/fa";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 
 
 const FRAMEWORK_STORAGE_SOURCE = "__nexo_framework__";
@@ -275,6 +279,7 @@ function CanvasBoard(){
     const editorRef = useRef(null);
     const chatBottomRef = useRef(null);
     const expandedFrameworkEditorRef = useRef(null);
+    const [activeCitationSource, setActiveCitationSource] = useState(null);
 
     const previewCloseTimerRef = useRef(null);
 
@@ -989,6 +994,76 @@ function CanvasBoard(){
         uploadedFile,
         uploadResult
     ) => {
+        const temporaryUploadId = uploadResult?.temporaryUploadId;
+        if (uploadResult?.ingestStatus === "indexing") {
+            const sourceType = getUploadedSourceType(
+                uploadedFile.name,
+                uploadResult?.sourceType
+            );
+
+            const temporaryNote = {
+                id: temporaryUploadId,
+                title: uploadedFile.name,
+                body: "Uploading and indexing this document. You can continue working on the canvas.",
+                userNote: "",
+                x: 260 + notes.length * 35,
+                y: 120 + notes.length * 35,
+                selected: true,
+
+                sourceType,
+                sourceName: uploadedFile.name,
+                fileUrl: "",
+                fileSize: uploadedFile.size,
+                chunksAdded: null,
+                dbTotal: null,
+                ingestStatus: "indexing",
+                isTemporary: true,
+            };
+
+            setNotes((prevNotes) => [...prevNotes, temporaryNote]);
+
+            setFiles((prevFiles) => [
+                {
+                    id: temporaryUploadId,
+                    title: uploadedFile.name,
+                    date: new Date().toISOString().slice(0, 10),
+                    size: formatFileSize(uploadedFile.size),
+                    sourceType,
+                    sourceName: uploadedFile.name,
+                    fileUrl: "",
+                    noteId: temporaryUploadId,
+                },
+                ...prevFiles,
+            ]);
+
+            return;
+        }
+        if (uploadResult?.success === false) {
+            if (temporaryUploadId) {
+                setNotes((prevNotes) =>
+                    prevNotes.map((note) =>
+                        note.id === temporaryUploadId
+                            ? {
+                                ...note,
+                                body:
+                                    "This document failed to upload or index.\n\n" +
+                                    (uploadResult.error || ""),
+                                ingestStatus: "failed",
+                            }
+                            : note
+                    )
+                );
+
+                return;
+            }
+
+            alert(
+                `${uploadedFile.name} failed to upload or index.\n` +
+                `${uploadResult.error || ""}`
+            );
+
+            return;
+        }
         const sourceType =
             getUploadedSourceType(
                 uploadedFile.name,
@@ -1043,56 +1118,31 @@ function CanvasBoard(){
                   : `${sourceDescription} uploaded successfully. Open the original file to view its contents.`;
 
         const newNoteData = {
-            title:
-                uploadedFile.name,
-
+            title: uploadedFile.name,
             body: noteBody,
-
             user_note: "",
+            x: 260 + notes.length * 35,
+            y: 120 + notes.length * 35,
 
-            x:
-                260 +
-                notes.length *
-                    35,
-
-            y:
-                120 +
-                notes.length *
-                    35,
-
-            source_type:
-                sourceType,
-
+            source_type: sourceType,
             source_name:
-                uploadResult
-                    ?.file ||
-                uploadResult
-                    ?.originalName ||
+                uploadResult?.file ||
+                uploadResult?.originalName ||
                 uploadedFile.name,
 
-            file_url:
-                uploadResult
-                    ?.fileUrl ||
-                "",
-
-            file_size:
-                uploadResult
-                    ?.fileSize ??
-                uploadedFile.size,
-
+            file_url: uploadResult?.fileUrl || "",
+            file_size: uploadResult?.fileSize ?? uploadedFile.size,
             chunks_added:
-                uploadResult
-                    ?.chunks_added ??
-                uploadResult
-                    ?.chunksAdded ??
+                uploadResult?.chunks_added ??
+                uploadResult?.chunksAdded ??
                 null,
 
             db_total:
-                uploadResult
-                    ?.db_total ??
-                uploadResult
-                    ?.dbTotal ??
+                uploadResult?.db_total ??
+                uploadResult?.dbTotal ??
                 null,
+
+            ingest_status: uploadResult?.ingested ? "indexed" : "uploaded",
         };
 
         try {
@@ -1115,24 +1165,40 @@ function CanvasBoard(){
                     data.note
                 );
 
-            setNotes(
-                (prevNotes) => [
-                    ...prevNotes,
-                    newCanvasNote,
-                ]
-            );
+            setNotes((prevNotes) => {
+                if (temporaryUploadId) {
+                    return prevNotes.map((note) =>
+                        note.id === temporaryUploadId
+                            ? {
+                                ...newCanvasNote,
+                                selected: note.selected,
+                            }
+                            : note
+                    );
+                }
+
+                return [...prevNotes, newCanvasNote];
+            });
 
             const newCabinetFile =
                 convertNoteToCabinetFile(
                     newCanvasNote
                 );
 
-            setFiles(
-                (prevFiles) => [
-                    newCabinetFile,
-                    ...prevFiles,
-                ]
-            );
+            setFiles((prevFiles) => {
+                if (temporaryUploadId) {
+                    return prevFiles.map((file) =>
+                        file.noteId === temporaryUploadId
+                            ? {
+                                ...newCabinetFile,
+                                noteId: newCanvasNote.id,
+                            }
+                            : file
+                    );
+                }
+
+                return [newCabinetFile, ...prevFiles];
+            });
 
             if (
                 uploadResult?.warning
@@ -1298,24 +1364,20 @@ function CanvasBoard(){
                     data.note
                 );
 
-            setNotes(
-                (prevNotes) => [
-                    ...prevNotes,
-                    newCanvasNote,
-                ]
-            );
+            setNotes((prevNotes) => [
+                ...prevNotes,
+                newCanvasNote,
+            ]);
 
             const newCabinetFile =
                 convertNoteToCabinetFile(
                     newCanvasNote
                 );
 
-            setFiles(
-                (prevFiles) => [
-                    newCabinetFile,
-                    ...prevFiles,
-                ]
-            );
+            setFiles((prevFiles) => [
+                newCabinetFile,
+                ...prevFiles,
+            ]);
 
             pushUndoSnapshot(before);
         } catch (error) {
@@ -1434,6 +1496,11 @@ function CanvasBoard(){
     );
     /***************************************************************************/
     const handleSendMessage = async () => {
+
+        if (isAiThinking) {
+            return;
+        }
+
         if (!chatInput.trim()) {
             return;
         };
@@ -1455,6 +1522,8 @@ function CanvasBoard(){
         setChatInput("");
         setIsAiThinking(true);
 
+        let timeoutId = null;
+
         try {
             // const isGeneralGreeting = /^(hi|hello|hey|how are you|thanks|thank you)\??$/i.test(question.trim());
             // const shouldUseRag = selectedNotesCount > 0 && !isGeneralGreeting;
@@ -1471,53 +1540,58 @@ function CanvasBoard(){
                     (note) =>
                         note.selected &&
                         note.sourceName &&
-                        note.sourceType !==
-                            "openalex"
+                        note.sourceType !== "openalex" &&
+                        note.ingestStatus !== "indexing" &&
+                        note.ingestStatus !== "failed" &&
+                        !note.isTemporary
                 )
-                .map(
-                    (note) =>
-                        note.sourceName
-                );
+                .map((note) => note.sourceName);
 
             const uniqueSelectedSourceNames = [...new Set(selectedSourceNames)];
 
             const shouldUseRag = uniqueSelectedSourceNames.length > 0;
 
-            const sourceFilter =
-                uniqueSelectedSourceNames.length === 1
-                    ? uniqueSelectedSourceNames[0]
-                    : "";
-
             const selectedSourcesText =
                 uniqueSelectedSourceNames.length > 0
-                    ? uniqueSelectedSourceNames.map((name, index) => `${index + 1}. ${name}`).join("\n")
+                    ? uniqueSelectedSourceNames
+                        .map((name, index) => `${index + 1}. ${name}`)
+                        .join("\n")
                     : "No selected sources.";
 
-            const isAskingSelectedSources =
-                /(source|sources|doc|docs|document|documents|selected|selecting|file|files|name|names)/i.test(question);
-
             const enhancedQuestion = shouldUseRag
-                ? `The user has selected the following source files:\n${selectedSourcesText}\n\nUser question: ${question}`
+                ? `The user has selected these source files:\n${selectedSourcesText}\n\nAnswer using only these selected sources.\n\nUser question: ${question}`
                 : question;
 
             console.log("CHAT RAG DEBUG:", {
                 question,
                 shouldUseRag,
                 selectedSources: uniqueSelectedSourceNames,
-                sourceFilter,
+                sourceFilter: uniqueSelectedSourceNames[0] || "",
+                sourceFilters: uniqueSelectedSourceNames,
                 enhancedQuestion,
             });
 
+            const abortController = new AbortController();
+
+            timeoutId = window.setTimeout(() => {
+                abortController.abort();
+            }, 90000);
+
             const data = await apiRequest("/ai/query-text", {
+                
                 method: "POST",
+                signal: abortController.signal,
                 body: JSON.stringify({
                     question: enhancedQuestion,
-                    top_k: 3,
+                    top_k: 5,
                     use_rag: shouldUseRag,
-                    source_filter: sourceFilter,
+                    source_filters: uniqueSelectedSourceNames,
+                    source_filter: uniqueSelectedSourceNames[0] || "",
                     chat_history: chatHistoryForApi,
+                    canvas_id: "default",
                 }),
             });
+            console.log("AI RESPONSE DATA:", data);
 
             const aiMessage = {
                 id: Date.now() + 1,
@@ -1534,13 +1608,106 @@ function CanvasBoard(){
             const errorMessage = {
                 id: Date.now() + 1,
                 role: "ai",
-                text: "Failed to get an answer from the AI service."
+                text:
+                    error?.message ||
+                    "Failed to get an answer from the AI service.",
             };
 
             setChatMessages((prevMessages) => [...prevMessages, errorMessage]);
         } finally {
+            if (timeoutId) {
+                window.clearTimeout(timeoutId);
+            }
             setIsAiThinking(false);
         }
+    };
+
+    const renderTextWithCitations = (value, sources = []) => {
+        if (typeof value !== "string") {
+            return value;
+        }
+
+        const parts = value.split(/(\[\s*S\d+(?:\s*,\s*S\d+)*\s*\])/gi);
+
+        return parts.map((part, index) => {
+            const groupMatch = part.match(/^\[\s*S\d+(?:\s*,\s*S\d+)*\s*\]$/i);
+
+            if (!groupMatch) {
+                return part;
+            }
+
+            const citationLabels = part.match(/S\d+/gi) || [];
+
+            return (
+                <span key={`${part}-${index}`} className="Citation_Group">
+                    {citationLabels.map((label, labelIndex) => {
+                        const normalizedLabel = label.toUpperCase();
+                        const citationNumber = Number(normalizedLabel.replace("S", ""));
+
+                        const source =
+                            sources.find((item) => item.citation_id === normalizedLabel) ||
+                            sources[citationNumber - 1];
+
+                        const button = source ? (
+                            <button
+                                type="button"
+                                className="Citation_Button"
+                                onClick={() => setActiveCitationSource(source)}
+                            >
+                                {normalizedLabel}
+                            </button>
+                        ) : (
+                            normalizedLabel
+                        );
+
+                        return (
+                            <React.Fragment key={`${normalizedLabel}-${labelIndex}`}>
+                                {labelIndex > 0 ? " " : ""}
+                                [{button}]
+                            </React.Fragment>
+                        );
+                    })}
+                </span>
+            );
+        });
+    };
+
+    const renderChildrenWithCitations = (children, sources = []) => {
+        return React.Children.map(children, (child) => {
+            if (typeof child === "string") {
+                return renderTextWithCitations(child, sources);
+            }
+
+            return child;
+        });
+    };
+
+    const renderAiMarkdown = (text, sources = []) => {
+        return (
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+                components={{
+                    p({ children }) {
+                        return (
+                            <p>
+                                {renderChildrenWithCitations(children, sources)}
+                            </p>
+                        );
+                    },
+
+                    li({ children }) {
+                        return (
+                            <li>
+                                {renderChildrenWithCitations(children, sources)}
+                            </li>
+                        );
+                    },
+                }}
+            >
+                {text}
+            </ReactMarkdown>
+        );
     };
     /***************************************************************************/
     const handleChatKeyDown = (event) => {
@@ -1871,24 +2038,25 @@ function CanvasBoard(){
                 dragInfo.noteIds
                     .map((noteId) => {
                         const startPosition =
-                            dragInfo.startPositions[
-                                noteId
-                            ];
+                            dragInfo.startPositions[noteId];
 
                         if (!startPosition) {
                             return null;
                         }
 
+                        const currentNote = notes.find(
+                            (note) => String(note.id) === String(noteId)
+                        );
+
+                        if (!currentNote) {
+                            return null;
+                        }
+
                         return {
                             id: noteId,
-
-                            x:
-                                startPosition.x +
-                                dragInfo.lastDeltaX,
-
-                            y:
-                                startPosition.y +
-                                dragInfo.lastDeltaY,
+                            x: startPosition.x + dragInfo.lastDeltaX,
+                            y: startPosition.y + dragInfo.lastDeltaY,
+                            isTemporary: Boolean(currentNote.isTemporary),
                         };
                     })
                     .filter(Boolean);
@@ -1897,9 +2065,17 @@ function CanvasBoard(){
                 return;
             }
 
+            const databaseMovedNotes = movedNotes.filter(
+                (note) => !note.isTemporary
+            );
+
+            if (databaseMovedNotes.length === 0) {
+                return;
+            }
+
             const updateResults =
                 await Promise.all(
-                    movedNotes.map((note) =>
+                    databaseMovedNotes.map((note) =>
                         updateNoteInDatabase(
                             note.id,
                             {
@@ -2712,6 +2888,7 @@ function CanvasBoard(){
     
             createdAt: note.created_at,
             updatedAt: note.updated_at,
+            ingestStatus: note.ingest_status || note.ingestStatus || "indexed",
         };
     };
     /***************************************************************************/
@@ -2797,9 +2974,18 @@ function CanvasBoard(){
         question,
         useRag = false,
         sourceFilter = "",
+        sourceFilters = [],
         topK = 5,
         signal,
     }) => {
+        const cleanSourceFilters = [
+            ...new Set(
+                (sourceFilters || [])
+                    .map((source) => String(source || "").trim())
+                    .filter(Boolean)
+            ),
+        ];
+
         const data = await apiRequest("/ai/query-text", {
             method: "POST",
             ...(signal ? { signal } : {}),
@@ -2807,8 +2993,10 @@ function CanvasBoard(){
                 question,
                 top_k: topK,
                 use_rag: useRag,
-                source_filter: sourceFilter,
+                source_filters: cleanSourceFilters,
+                source_filter: sourceFilter || cleanSourceFilters[0] || "",
                 chat_history: [],
+                canvas_id: "default",
             }),
         });
 
@@ -3281,20 +3469,30 @@ function CanvasBoard(){
     - Return clean Markdown only.
     - Do not include a conversational introduction.
     - Begin with "# Research Framework".
-    - Include a focused research question.
-    - Include a working argument or hypothesis.
+    - First identify the likely academic domain of the selected material.
+    - Adapt the framework structure to that domain:
+        - Engineering / computer science: problem, method, assumptions, system design, evaluation, limitations.
+        - Science / physics / chemistry / biology: key concepts, mechanisms, equations, evidence, examples, limitations.
+        - Mathematics: definitions, claims, proof strategy, worked examples, assumptions, gaps.
+        - Humanities / arts: themes, context, formal analysis, interpretation, evidence, counterarguments.
+        - Business / policy: problem, stakeholders, options, risks, implementation, metrics.
+    - Include a focused research question or learning question.
+    - Include a working argument, hypothesis, or analytical direction.
     - Organize the framework into numbered sections.
     - Connect every major claim to evidence from the selected materials.
-    - Cite sources using their actual filenames.
-    - Do not invent quotations, evidence, authors, methods, or results.
+    - Use citation IDs such as [S1], [S2], [S3] for evidence.
+    - Do not cite sources that were not retrieved.
+    - Do not invent quotations, evidence, authors, methods, results, formulas, or page details.
     - Write "NEEDS EVIDENCE" where the selected material is insufficient.
-    - End with research gaps and recommended next steps.
+    - If the selected source is homework, quiz, exam, or graded assignment material, do not provide final answers. Build a study framework, concept map, and step-by-step learning plan instead.
+    - End with research gaps, study gaps, or recommended next steps.
             `.trim();
 
             const result = await requestAiText({
                 question: generationPrompt,
                 useRag: true,
-                sourceFilter,
+                sourceFilters: selectedSourceNames,
+                sourceFilter: selectedSourceNames[0] || "",
                 topK: Math.min(
                     10,
                     Math.max(5, selectedFrameworkSources.length * 3)
@@ -3560,10 +3758,20 @@ ${frameworkEditorDraft.slice(0, 60000)}
             const newCabinetFile =
                 convertNoteToCabinetFile(newOutlineNote);
 
-            setFiles((previousFiles) => [
-                newCabinetFile,
-                ...previousFiles,
-            ]);
+            setFiles((prevFiles) => {
+                if (temporaryUploadId) {
+                    return prevFiles.map((file) =>
+                        file.noteId === temporaryUploadId
+                            ? {
+                                ...newCabinetFile,
+                                noteId: newCanvasNote.id,
+                            }
+                            : file
+                    );
+                }
+
+                return [newCabinetFile, ...prevFiles];
+            });
 
             setIsFrameworkExpanded(false);
             setIsFrameworkPanelOpen(false);
@@ -4858,8 +5066,11 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                 </p>
 
                                 <p className="Canvas_Note_Meta">
-                                    {getCanvasNoteTypeLabel(
-                                        note.noteKind
+                                    {getCanvasNoteTypeLabel(note.sourceType)}
+                                    {note.ingestStatus && (
+                                        <span className={`Canvas_Note_Status Status_${note.ingestStatus}`}>
+                                            {note.ingestStatus}
+                                        </span>
                                     )}
                                 </p>
 
@@ -5034,7 +5245,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                                         >
                                                             {message.role === "ai" ? (
                                                                 <div className="Chat_Message_Text">
-                                                                    <ReactMarkdown>{message.text}</ReactMarkdown>
+                                                                    {renderAiMarkdown(message.text, message.sources || [])}
                                                                 </div>
                                                             ) : (
                                                                 <div className="Chat_Message_Text">
@@ -5053,12 +5264,41 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                                         </div>
                                                     </div>
                                                 )}
-
+                                                
                                                 <div ref={chatBottomRef} />
                                             </div>
                                         )}
                                     </div>
+                                    {activeCitationSource && (
+                                        <div className="Citation_Preview_Card">
+                                            <div className="Citation_Preview_Header">
+                                                <div>
+                                                    <p>Source Evidence</p>
+                                                    <h3>{activeCitationSource.file || "Source"}</h3>
+                                                    <span>Chunk {activeCitationSource.chunk || ""}</span>
+                                                    <span className="Citation_Preview_Note">
+                                                        Extracted text preview
+                                                    </span>
+                                                </div>
 
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveCitationSource(null)}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+
+                                            <div className="Citation_Preview_Body">
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm, remarkMath]}
+                                                    rehypePlugins={[rehypeKatex]}
+                                                >
+                                                    {activeCitationSource.text || activeCitationSource.preview || "No preview available."}
+                                                </ReactMarkdown>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="Chat_Input_Bar">
                                         <input
                                             className="Chat_Input"

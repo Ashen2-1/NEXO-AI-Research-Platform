@@ -4,22 +4,23 @@ import authMiddleware from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 const getFastApiBaseUrl = () => {
-    const configuredUrl = process.env.FASTAPI_BASE_URL?.trim();
+    const configuredUrl =
+        process.env.FASTAPI_BASE_URL?.trim();
 
-    // The existing local AI service in this project normally runs on port 8000.
-    // An environment value, when present, still takes priority.
-    return (configuredUrl || "http://127.0.0.1:8000").replace(/\/+$/, "");
+    return (
+        configuredUrl || "http://127.0.0.1:8000"
+    ).replace(/\/+$/, "");
 };
 
 const buildFastApiHeaders = () => {
     const headers = {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type":
+            "application/x-www-form-urlencoded",
     };
 
-    const apiKey = process.env.FASTAPI_API_KEY?.trim();
+    const apiKey =
+        process.env.FASTAPI_API_KEY?.trim();
 
-    // Do not send an "undefined" key. Local FastAPI setups that do not require
-    // an API key can therefore work without adding a new .env value.
     if (apiKey) {
         headers["X-API-Key"] = apiKey;
     }
@@ -38,87 +39,266 @@ const parseUpstreamResponse = async (response) => {
         return JSON.parse(responseText);
     } catch {
         return {
-            detail: responseText.replace(/\s+/g, " ").slice(0, 500),
+            detail: responseText
+                .replace(/\s+/g, " ")
+                .slice(0, 500),
         };
     }
 };
 
-router.post("/query-text", authMiddleware, async (req, res) => {
-    const {
-        question,
-        top_k = 3,
-        source_filter = "",
-        use_rag = false,
-        chat_history = [],
-    } = req.body;
-
-    const shouldUseRag = use_rag === true || use_rag === "true";
-
-    if (!question || !question.trim()) {
-        return res.status(400).json({
-            error: "Question is required.",
-        });
+const normalizeChatHistory = (history) => {
+    if (!Array.isArray(history)) {
+        return [];
     }
 
-    const formData = new URLSearchParams();
-    formData.append("question", question);
-    formData.append("chat_history", JSON.stringify(chat_history));
+    return history
+        .slice(-10)
+        .map((message) => {
+            const role =
+                message?.role === "ai" ||
+                message?.role === "assistant"
+                    ? "assistant"
+                    : "user";
 
-    let endpoint = "/query/general";
+            const content = String(
+                message?.content ??
+                message?.text ??
+                ""
+            )
+                .trim()
+                .slice(0, 8000);
 
-    if (shouldUseRag) {
-        endpoint = "/query/text";
-        formData.append("top_k", String(top_k));
+            return {
+                role,
+                content,
+            };
+        })
+        .filter((message) => message.content);
+};
 
-        if (source_filter) {
-            formData.append("source_filter", source_filter);
+const normalizeSourceFilters = (
+    sourceFilters,
+    legacySourceFilter
+) => {
+    let candidates = [];
+
+    if (Array.isArray(sourceFilters)) {
+        candidates = sourceFilters;
+    } else if (
+        typeof sourceFilters === "string" &&
+        sourceFilters.trim()
+    ) {
+        try {
+            const parsed =
+                JSON.parse(sourceFilters);
+
+            candidates = Array.isArray(parsed)
+                ? parsed
+                : [sourceFilters];
+        } catch {
+            candidates = [sourceFilters];
         }
     }
 
-    const fastApiBaseUrl = getFastApiBaseUrl();
-    const targetUrl = `${fastApiBaseUrl}${endpoint}`;
+    if (
+        typeof legacySourceFilter === "string" &&
+        legacySourceFilter.trim()
+    ) {
+        candidates.push(legacySourceFilter);
+    }
 
-    console.log("AI ROUTE DEBUG:", {
-        shouldUseRag,
-        endpoint,
-        sourceFilter: source_filter || null,
-        historyCount: Array.isArray(chat_history) ? chat_history.length : 0,
-        targetUrl,
-    });
+    return [
+        ...new Set(
+            candidates
+                .map((source) =>
+                    String(source).trim()
+                )
+                .filter(Boolean)
+                .filter(
+                    (source) =>
+                        !source.startsWith("__nexo_")
+                )
+        ),
+    ].slice(0, 20);
+};
 
-    try {
-        const response = await fetch(targetUrl, {
-            method: "POST",
-            headers: buildFastApiHeaders(),
-            body: formData.toString(),
-        });
+router.post(
+    "/query-text",
+    authMiddleware,
+    async (req, res) => {
+        const {
+            question,
+            top_k = 5,
+            source_filter = "",
+            source_filters = [],
+            use_rag = false,
+            chat_history = [],
+            canvas_id = "default",
+        } = req.body;
 
-        const data = await parseUpstreamResponse(response);
-
-        if (!response.ok) {
-            return res.status(response.status).json({
-                error:
-                    data.detail ||
-                    data.error ||
-                    `AI service returned status ${response.status}.`,
+        if (
+            !question ||
+            !String(question).trim()
+        ) {
+            return res.status(400).json({
+                error: "Question is required.",
             });
         }
 
-        return res.json({
-            answer: data.answer,
-            sources: data.sources || [],
-            mode: data.mode,
-            question: data.question,
-        });
-    } catch (error) {
-        console.error("AI query error:", error);
+        /*
+         * 安全重点：
+         * user_id 只能来自验证后的 JWT。
+         * 绝对不能使用 req.body.user_id，
+         * 否则用户可以伪造其他用户 ID。
+         */
+        const userId = String(
+            req.user.id
+        ).trim();
 
-        return res.status(502).json({
-            error:
-                `Could not reach the AI service at ${fastApiBaseUrl}. ` +
-                "Start the existing FastAPI service or set FASTAPI_BASE_URL to its address.",
+        const canvasId =
+            String(canvas_id || "default")
+                .trim()
+                .slice(0, 200) ||
+            "default";
+
+        const shouldUseRag =
+            use_rag === true ||
+            use_rag === "true";
+
+        const safeTopK = Math.max(
+            1,
+            Math.min(
+                Number.parseInt(top_k, 10) || 3,
+                10
+            )
+        );
+
+        const safeChatHistory =
+            normalizeChatHistory(chat_history);
+
+        const selectedSources =
+            normalizeSourceFilters(
+                source_filters,
+                source_filter
+            );
+
+        const formData = new URLSearchParams();
+
+        formData.append(
+            "question",
+            String(question).trim()
+        );
+
+        formData.append(
+            "user_id",
+            userId
+        );
+
+        formData.append(
+            "canvas_id",
+            canvasId
+        );
+
+        formData.append(
+            "chat_history",
+            JSON.stringify(safeChatHistory)
+        );
+
+        let endpoint = "/query/general";
+
+        if (shouldUseRag) {
+            endpoint = "/query/text";
+
+            formData.append(
+                "top_k",
+                String(safeTopK)
+            );
+
+            
+            if (selectedSources.length > 0) {
+                // 新接口：发送完整来源数组
+                formData.append(
+                    "source_filters",
+                    JSON.stringify(selectedSources)
+                );
+
+                // 暂时兼容 Python 旧的单来源接口
+                if (selectedSources.length === 1) {
+                    formData.append(
+                        "source_filter",
+                        selectedSources[0]
+                    );
+                }
+            }
+        }
+
+        const fastApiBaseUrl =
+            getFastApiBaseUrl();
+
+        const targetUrl =
+            `${fastApiBaseUrl}${endpoint}`;
+
+        console.log("AI ROUTE DEBUG:", {
+            userId,
+            canvasId,
+            shouldUseRag,
+            endpoint,
+            selectedSources,
+            historyCount: safeChatHistory.length,
+            targetUrl,
         });
+
+        try {
+            const response = await fetch(
+                targetUrl,
+                {
+                    method: "POST",
+                    headers:
+                        buildFastApiHeaders(),
+                    body: formData.toString(),
+                }
+            );
+
+            const data =
+                await parseUpstreamResponse(
+                    response
+                );
+
+            if (!response.ok) {
+                return res
+                    .status(response.status)
+                    .json({
+                        error:
+                            data.detail ||
+                            data.error ||
+                            `AI service returned status ${response.status}.`,
+                    });
+            }
+
+            return res.json({
+                answer:
+                    data.answer ||
+                    "No answer returned.",
+                sources:
+                    Array.isArray(data.sources)
+                        ? data.sources
+                        : [],
+                mode: data.mode,
+                question: data.question,
+            });
+        } catch (error) {
+            console.error(
+                "AI query error:",
+                error
+            );
+
+            return res.status(502).json({
+                error:
+                    `Could not reach the AI service at ${fastApiBaseUrl}. ` +
+                    "Check FASTAPI_BASE_URL and the Python service.",
+            });
+        }
     }
-});
+);
 
 export default router;
