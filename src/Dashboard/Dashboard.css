@@ -72,7 +72,7 @@
 }
 
 .Dashboard_Main {
-  max-width: 1280px;
+  max-width: 1360px;
   margin: 0 auto;
   background: #fff;
   min-height: calc(100vh - 72px);
@@ -383,4 +383,141 @@
     flex-direction: column;
     gap: 14px;
   }
+}
+
+
+.Dashboard_Project_Badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.Dashboard_Project_Badges span {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #f1f1f1;
+  color: #666;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.Dashboard_User {
+  border: none;
+  cursor: pointer;
+}
+
+.Dashboard_User:hover {
+  background: #111;
+}
+
+.Theme_cards .Thumb_Dark {
+  left: 34%;
+  top: 34px;
+}
+
+.Theme_cards .Thumb_Light {
+  right: 18%;
+  top: 58px;
+}
+
+.Theme_minimal .Thumb_Dark {
+  width: 72px;
+  height: 58px;
+  left: 30%;
+  top: 48px;
+}
+
+.Theme_minimal .Thumb_Light {
+  width: 68px;
+  height: 50px;
+  right: 22%;
+  top: 46px;
+}
+
+.Theme_archive .Thumb_Dark {
+  width: 88px;
+  height: 96px;
+  left: 24%;
+  top: 24px;
+}
+
+.Theme_archive .Thumb_Light {
+  width: 86px;
+  height: 78px;
+  right: 15%;
+  top: 36px;
+}
+
+.Theme_notes .Thumb_Dark {
+  width: 52px;
+  height: 68px;
+  left: 62%;
+  top: 40px;
+}
+
+.Theme_notes .Thumb_Light {
+  width: 92px;
+  height: 76px;
+  right: 42%;
+  top: 34px;
+}
+
+.Theme_network .Thumb_Dark {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  left: 24%;
+  top: 46px;
+}
+
+.Theme_network .Thumb_Light {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  right: 24%;
+  top: 42px;
+}
+
+.Theme_network .Dashboard_Project_Thumbnail::before {
+  content: "";
+  position: absolute;
+  left: 32%;
+  right: 30%;
+  top: 73px;
+  height: 1px;
+  background: #777;
+  transform: rotate(-12deg);
+}
+
+.Theme_network .Dashboard_Project_Thumbnail::after {
+  content: "";
+  position: absolute;
+  left: 38%;
+  right: 20%;
+  top: 88px;
+  height: 1px;
+  background: #aaa;
+  transform: rotate(20deg);
+}
+
+.Theme_interface .Thumb_Dark {
+  width: 110px;
+  height: 22px;
+  left: 10%;
+  top: 26px;
+}
+
+.Theme_interface .Thumb_Light {
+  width: 210px;
+  height: 74px;
+  right: 12%;
+  top: 58px;
+}
+
+.Theme_interface .Thumb_Lines {
+  left: 14%;
+  top: 72px;
 }
