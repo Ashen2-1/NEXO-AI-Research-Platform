@@ -2053,3 +2053,260 @@ body,
     background: #ffebee;
     color: #c62828;
 }
+
+/* =========================================================
+   Feedback modal
+   ========================================================= */
+
+   .Feedback_Modal_Overlay {
+    position: fixed;
+    inset: 0;
+
+    z-index: 1600;
+
+    padding: 24px;
+
+    background:
+        rgba(255, 255, 255, 0.82);
+
+    backdrop-filter: blur(1px);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.Feedback_Modal {
+    width: min(
+        890px,
+        calc(100vw - 48px)
+    );
+
+    max-height:
+        calc(100dvh - 48px);
+
+    padding: 38px 40px 36px;
+
+    background: #ffffff;
+
+    border: 1px solid #cfcfcf;
+    border-radius: 10px;
+
+    box-shadow:
+        0 18px 50px
+        rgba(0, 0, 0, 0.14);
+
+    overflow-y: auto;
+
+    font-family:
+        Inter,
+        Arial,
+        Helvetica,
+        sans-serif;
+}
+
+.Feedback_Modal_Header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.Feedback_Modal_Header h2 {
+    margin: 4px 0 0;
+
+    color: #111111;
+
+    font-size: clamp(
+        28px,
+        3vw,
+        36px
+    );
+
+    line-height: 1.15;
+    font-weight: 700;
+}
+
+.Feedback_Modal_Close {
+    width: 48px;
+    height: 48px;
+
+    padding: 0;
+
+    flex: 0 0 48px;
+
+    border: none;
+    border-radius: 8px;
+
+    background: #f2f2f2;
+    color: #111111;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 32px;
+    font-weight: 300;
+    line-height: 1;
+
+    cursor: pointer;
+}
+
+.Feedback_Modal_Close:hover {
+    background: #e6e6e6;
+}
+
+.Feedback_Modal_Intro {
+    margin: 28px 0 30px;
+
+    color: #696969;
+
+    font-size: clamp(
+        16px,
+        1.6vw,
+        20px
+    );
+
+    line-height: 1.45;
+}
+
+.Feedback_Field_Label {
+    display: block;
+
+    margin-bottom: 12px;
+
+    color: #111111;
+
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.Feedback_Textarea {
+    width: 100%;
+    min-height: 225px;
+
+    padding: 20px;
+
+    border: 1px solid #cfcfcf;
+    border-radius: 10px;
+
+    background: #ffffff;
+    color: #222222;
+
+    resize: vertical;
+    outline: none;
+
+    font-family: inherit;
+    font-size: 17px;
+    line-height: 1.5;
+}
+
+.Feedback_Textarea::placeholder {
+    color: #7b7b7b;
+}
+
+.Feedback_Textarea:focus {
+    border-color: #777777;
+
+    box-shadow:
+        0 0 0 3px
+        rgba(0, 0, 0, 0.05);
+}
+
+.Feedback_Privacy_Note {
+    margin: 26px 0;
+
+    color: #6c6c6c;
+
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.Feedback_Modal_Actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+}
+
+.Feedback_Cancel_Button,
+.Feedback_Send_Button {
+    min-height: 52px;
+
+    padding: 0 26px;
+
+    border-radius: 10px;
+
+    font-family: inherit;
+    font-size: 17px;
+    font-weight: 500;
+
+    cursor: pointer;
+}
+
+.Feedback_Cancel_Button {
+    border: 1px solid #cccccc;
+
+    background: #ffffff;
+    color: #111111;
+}
+
+.Feedback_Cancel_Button:hover {
+    background: #f3f3f3;
+}
+
+.Feedback_Send_Button {
+    min-width: 210px;
+
+    border: 1px solid #111111;
+
+    background: #111111;
+    color: #ffffff;
+}
+
+.Feedback_Send_Button:hover {
+    background: #292929;
+}
+
+@media (max-width: 700px) {
+    .Feedback_Modal_Overlay {
+        padding: 12px;
+
+        align-items: flex-start;
+
+        overflow-y: auto;
+    }
+
+    .Feedback_Modal {
+        width: 100%;
+
+        margin: 12px 0;
+
+        padding: 24px 20px;
+    }
+
+    .Feedback_Modal_Close {
+        width: 42px;
+        height: 42px;
+
+        flex-basis: 42px;
+
+        font-size: 28px;
+    }
+
+    .Feedback_Textarea {
+        min-height: 180px;
+
+        font-size: 15px;
+    }
+
+    .Feedback_Modal_Actions {
+        flex-direction: column-reverse;
+    }
+
+    .Feedback_Cancel_Button,
+    .Feedback_Send_Button {
+        width: 100%;
+        min-width: 0;
+    }
+}
