@@ -251,6 +251,23 @@ function FrameworkPanel({
         );
     };
 
+    const getReadableEvidenceText = (source) => {
+        const rawText = String(
+            source?.text ||
+            source?.preview ||
+            "No preview available."
+        );
+
+        return rawText
+            .replace(/\(cid:\d+\)/g, " ")
+            .replace(/\x00/g, " ")
+            .replace(/([a-z])([A-Z])/g, "$1 $2")
+            .replace(/([.!?])([A-Z])/g, "$1 $2")
+            .replace(/[ \t]+/g, " ")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+    };
+
     return (
         <div className="Framework_Panel">
             <div className="Framework_Panel_Header">
@@ -690,9 +707,13 @@ function FrameworkPanel({
                                 </div>
 
                                 <div className="Framework_Preview_Evidence_Body">
-                                    {frameworkCitationSource.text ||
-                                        frameworkCitationSource.preview ||
-                                        "No preview available."}
+                                    {renderAiMarkdown
+                                        ? renderAiMarkdown(
+                                            getReadableEvidenceText(frameworkCitationSource),
+                                            [],
+                                            () => {}
+                                        )
+                                        : getReadableEvidenceText(frameworkCitationSource)}
                                 </div>
                             </div>
                         )}
