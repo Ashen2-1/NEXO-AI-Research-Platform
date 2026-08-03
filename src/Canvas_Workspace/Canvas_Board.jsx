@@ -879,11 +879,74 @@ function CanvasBoard(){
         uploadedFile,
         uploadResult
     ) => {
+        const temporaryUploadId = uploadResult?.temporaryUploadId;
+        if (uploadResult?.ingestStatus === "indexing") {
+            const sourceType = getUploadedSourceType(
+                uploadedFile.name,
+                uploadResult?.sourceType
+            );
+
+            const temporaryNote = {
+                id: temporaryUploadId,
+                title: uploadedFile.name,
+                body: "Uploading and indexing this document. You can continue working on the canvas.",
+                userNote: "",
+                x: 260 + notes.length * 35,
+                y: 120 + notes.length * 35,
+                selected: true,
+
+                sourceType,
+                sourceName: uploadedFile.name,
+                fileUrl: "",
+                fileSize: uploadedFile.size,
+                chunksAdded: null,
+                dbTotal: null,
+                ingestStatus: "indexing",
+                isTemporary: true,
+            };
+
+            setNotes((prevNotes) => [...prevNotes, temporaryNote]);
+
+            setFiles((prevFiles) => [
+                {
+                    id: temporaryUploadId,
+                    title: uploadedFile.name,
+                    date: new Date().toISOString().slice(0, 10),
+                    size: formatFileSize(uploadedFile.size),
+                    sourceType,
+                    sourceName: uploadedFile.name,
+                    fileUrl: "",
+                    noteId: temporaryUploadId,
+                },
+                ...prevFiles,
+            ]);
+
+            return;
+        }
         if (uploadResult?.success === false) {
+            if (temporaryUploadId) {
+                setNotes((prevNotes) =>
+                    prevNotes.map((note) =>
+                        note.id === temporaryUploadId
+                            ? {
+                                ...note,
+                                body:
+                                    "This document failed to upload or index.\n\n" +
+                                    (uploadResult.error || ""),
+                                ingestStatus: "failed",
+                            }
+                            : note
+                    )
+                );
+
+                return;
+            }
+
             alert(
                 `${uploadedFile.name} failed to upload or index.\n` +
                 `${uploadResult.error || ""}`
             );
+
             return;
         }
         const sourceType =
@@ -987,24 +1050,40 @@ function CanvasBoard(){
                     data.note
                 );
 
-            setNotes(
-                (prevNotes) => [
-                    ...prevNotes,
-                    newCanvasNote,
-                ]
-            );
+            setNotes((prevNotes) => {
+                if (temporaryUploadId) {
+                    return prevNotes.map((note) =>
+                        note.id === temporaryUploadId
+                            ? {
+                                ...newCanvasNote,
+                                selected: note.selected,
+                            }
+                            : note
+                    );
+                }
+
+                return [...prevNotes, newCanvasNote];
+            });
 
             const newCabinetFile =
                 convertNoteToCabinetFile(
                     newCanvasNote
                 );
 
-            setFiles(
-                (prevFiles) => [
-                    newCabinetFile,
-                    ...prevFiles,
-                ]
-            );
+            setFiles((prevFiles) => {
+                if (temporaryUploadId) {
+                    return prevFiles.map((file) =>
+                        file.noteId === temporaryUploadId
+                            ? {
+                                ...newCabinetFile,
+                                noteId: newCanvasNote.id,
+                            }
+                            : file
+                    );
+                }
+
+                return [newCabinetFile, ...prevFiles];
+            });
 
             if (
                 uploadResult?.warning
@@ -1170,24 +1249,40 @@ function CanvasBoard(){
                     data.note
                 );
 
-            setNotes(
-                (prevNotes) => [
-                    ...prevNotes,
-                    newCanvasNote,
-                ]
-            );
+            setNotes((prevNotes) => {
+                if (temporaryUploadId) {
+                    return prevNotes.map((note) =>
+                        note.id === temporaryUploadId
+                            ? {
+                                ...newCanvasNote,
+                                selected: note.selected,
+                            }
+                            : note
+                    );
+                }
+
+                return [...prevNotes, newCanvasNote];
+            });
 
             const newCabinetFile =
                 convertNoteToCabinetFile(
                     newCanvasNote
                 );
 
-            setFiles(
-                (prevFiles) => [
-                    newCabinetFile,
-                    ...prevFiles,
-                ]
-            );
+            setFiles((prevFiles) => {
+                if (temporaryUploadId) {
+                    return prevFiles.map((file) =>
+                        file.noteId === temporaryUploadId
+                            ? {
+                                ...newCabinetFile,
+                                noteId: newCanvasNote.id,
+                            }
+                            : file
+                    );
+                }
+
+                return [newCabinetFile, ...prevFiles];
+            });
 
             pushUndoSnapshot(before);
         } catch (error) {
@@ -3516,10 +3611,20 @@ ${frameworkEditorDraft.slice(0, 60000)}
             const newCabinetFile =
                 convertNoteToCabinetFile(newOutlineNote);
 
-            setFiles((previousFiles) => [
-                newCabinetFile,
-                ...previousFiles,
-            ]);
+            setFiles((prevFiles) => {
+                if (temporaryUploadId) {
+                    return prevFiles.map((file) =>
+                        file.noteId === temporaryUploadId
+                            ? {
+                                ...newCabinetFile,
+                                noteId: newCanvasNote.id,
+                            }
+                            : file
+                    );
+                }
+
+                return [newCabinetFile, ...prevFiles];
+            });
 
             setIsFrameworkExpanded(false);
             setIsFrameworkPanelOpen(false);

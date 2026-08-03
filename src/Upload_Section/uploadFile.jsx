@@ -234,23 +234,41 @@ const getFileExtension = (
       setProgress(fileBaseProgress);
 
       try {
-        const result = await uploadSingleFile(currentFile, index, totalFiles);
-
-        uploadedResults.push({
-          file: currentFile,
-          result,
-        });
+        const temporaryUploadId = `${currentFile.name}-${currentFile.size}-${Date.now()}-${index}`;
 
         if (onUploadSuccess) {
-          onUploadSuccess(currentFile, result);
+          onUploadSuccess(currentFile, {
+            success: true,
+            temporaryUploadId,
+            ingested: false,
+            ingestStatus: "indexing",
+            file: currentFile.name,
+            originalName: currentFile.name,
+            fileSize: currentFile.size,
+          });
+        }
+
+        const result = await uploadSingleFile(currentFile, index, totalFiles);
+
+        if (onUploadSuccess) {
+          onUploadSuccess(currentFile, {
+            ...result,
+            success: true,
+            temporaryUploadId,
+            ingestStatus: result?.ingested ? "indexed" : "uploaded",
+          });
         }
       } catch (error) {
         console.error("Upload failed:", currentFile.name, error);
 
         if (onUploadSuccess) {
           onUploadSuccess(currentFile, {
-            file: currentFile.name,
             success: false,
+            temporaryUploadId,
+            ingestStatus: "failed",
+            file: currentFile.name,
+            originalName: currentFile.name,
+            fileSize: currentFile.size,
             error: error.message || "Upload failed",
           });
         }
