@@ -1,11 +1,15 @@
-import React, { useEffect, useRef } from "react";
+import React, {
+    useEffect,
+    useRef,
+    useState,
+} from "react";
 import "./FrameworkPanel.css";
 
 const frameworkValueToHtml = (value) => {
     const text = String(value || "");
 
     const alreadyHtml =
-        /<\/?(p|div|br|strong|b|em|i|ul|ol|li|h[1-6]|blockquote|pre)\b/i.test(
+        /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|h[1-6]|blockquote|pre)\b/i.test(
             text
         );
 
@@ -18,6 +22,76 @@ const frameworkValueToHtml = (value) => {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/\n/g, "<br>");
+};
+
+const EMPTY_INLINE_FORMAT_STATE = {
+    bold: false,
+    italic: false,
+    underline: false,
+};
+
+const getInlineFormatState = (editor) => {
+    const selection = window.getSelection();
+
+    const selectionIsInsideEditor =
+        editor &&
+        selection &&
+        selection.rangeCount > 0 &&
+        selection.anchorNode &&
+        selection.focusNode &&
+        editor.contains(selection.anchorNode) &&
+        editor.contains(selection.focusNode);
+
+    if (!selectionIsInsideEditor) {
+        return {
+            ...EMPTY_INLINE_FORMAT_STATE,
+        };
+    }
+
+    try {
+        return {
+            bold:
+                document.queryCommandState(
+                    "bold"
+                ),
+
+            italic:
+                document.queryCommandState(
+                    "italic"
+                ),
+
+            underline:
+                document.queryCommandState(
+                    "underline"
+                ),
+        };
+    } catch (error) {
+        return {
+            ...EMPTY_INLINE_FORMAT_STATE,
+        };
+    }
+};
+
+const syncInlineFormatState = (
+    editor,
+    setFormatState
+) => {
+    const nextState =
+        getInlineFormatState(editor);
+
+    setFormatState((previousState) => {
+        const didNotChange =
+            previousState.bold ===
+                nextState.bold &&
+            previousState.italic ===
+                nextState.italic &&
+            previousState.underline ===
+                nextState.underline;
+
+        return didNotChange
+            ? previousState
+            : nextState;
+    });
 };
 
 function FrameworkPanel({
@@ -58,6 +132,13 @@ function FrameworkPanel({
 }) {
     const frameworkEditorRef = useRef(null);
 
+    const [
+        frameworkFormatState,
+        setFrameworkFormatState,
+    ] = useState(() => ({
+        ...EMPTY_INLINE_FORMAT_STATE,
+    }));
+
     useEffect(() => {
         const editor = frameworkEditorRef.current;
 
@@ -71,6 +152,47 @@ function FrameworkPanel({
             editor.innerHTML = nextHtml;
         }
     }, [frameworkEditorDraft, currentFramework?.id]);
+
+    useEffect(() => {
+        if (step !== "output") {
+            setFrameworkFormatState({
+                ...EMPTY_INLINE_FORMAT_STATE,
+            });
+    
+            return;
+        }
+    
+        const handleSelectionChange = () => {
+            syncInlineFormatState(
+                frameworkEditorRef.current,
+                setFrameworkFormatState
+            );
+        };
+    
+        document.addEventListener(
+            "selectionchange",
+            handleSelectionChange
+        );
+    
+        const frameId =
+            window.requestAnimationFrame(
+                handleSelectionChange
+            );
+    
+        return () => {
+            window.cancelAnimationFrame(
+                frameId
+            );
+    
+            document.removeEventListener(
+                "selectionchange",
+                handleSelectionChange
+            );
+        };
+    }, [
+        step,
+        currentFramework?.id,
+    ]);
 
     const handleFrameworkCommand = (event, command, value = null) => {
         // 防止按钮抢走编辑区中的文字选区
@@ -86,6 +208,11 @@ function FrameworkPanel({
         document.execCommand(command, false, value);
 
         setFrameworkEditorDraft(editor.innerHTML);
+
+        syncInlineFormatState(
+            editor,
+            setFrameworkFormatState
+        );
     };
 
     const toggleOption = (key) => {
@@ -333,8 +460,19 @@ function FrameworkPanel({
 
                             <button
                                 type="button"
+                                className={
+                                    frameworkFormatState.bold
+                                        ? "Format_Button_Active"
+                                        : ""
+                                }
+                                aria-pressed={
+                                    frameworkFormatState.bold
+                                }
                                 onMouseDown={(event) =>
-                                    handleFrameworkCommand(event, "bold")
+                                    handleFrameworkCommand(
+                                        event,
+                                        "bold"
+                                    )
                                 }
                             >
                                 <b>B</b>
@@ -342,11 +480,42 @@ function FrameworkPanel({
 
                             <button
                                 type="button"
+                                className={
+                                    frameworkFormatState.italic
+                                        ? "Format_Button_Active"
+                                        : ""
+                                }
+                                aria-pressed={
+                                    frameworkFormatState.italic
+                                }
                                 onMouseDown={(event) =>
-                                    handleFrameworkCommand(event, "italic")
+                                    handleFrameworkCommand(
+                                        event,
+                                        "italic"
+                                    )
                                 }
                             >
                                 <i>I</i>
+                            </button>
+
+                            <button
+                                type="button"
+                                className={
+                                    frameworkFormatState.underline
+                                        ? "Format_Button_Active"
+                                        : ""
+                                }
+                                aria-pressed={
+                                    frameworkFormatState.underline
+                                }
+                                onMouseDown={(event) =>
+                                    handleFrameworkCommand(
+                                        event,
+                                        "underline"
+                                    )
+                                }
+                            >
+                                <u>U</u>
                             </button>
 
                             <button
@@ -377,9 +546,35 @@ function FrameworkPanel({
                             contentEditable
                             suppressContentEditableWarning
                             data-placeholder="Framework content will appear here..."
-                            onInput={(event) =>
+                            onInput={(event) => {
                                 setFrameworkEditorDraft(
                                     event.currentTarget.innerHTML
+                                );
+                            
+                                syncInlineFormatState(
+                                    event.currentTarget,
+                                    setFrameworkFormatState
+                                );
+                            }}
+                            
+                            onMouseUp={() =>
+                                syncInlineFormatState(
+                                    frameworkEditorRef.current,
+                                    setFrameworkFormatState
+                                )
+                            }
+                            
+                            onKeyUp={() =>
+                                syncInlineFormatState(
+                                    frameworkEditorRef.current,
+                                    setFrameworkFormatState
+                                )
+                            }
+                            
+                            onFocus={() =>
+                                syncInlineFormatState(
+                                    frameworkEditorRef.current,
+                                    setFrameworkFormatState
                                 )
                             }
                         />
