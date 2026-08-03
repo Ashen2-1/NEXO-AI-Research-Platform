@@ -47,6 +47,7 @@ function Header({
     onSave,
     onExport,
     onShare,
+    onFeedback,
     onSettings,
 }) {
     const isCanvasMode = activeToolMode === "canvas";
@@ -83,11 +84,96 @@ function Header({
                     </div>
 
                     <div className="Header_Action_Group">
-                        <button type="button" onClick={onSave}>▣ Save</button>
-                        <button type="button" onClick={onExport}>⇩ Export</button>
-                        <button type="button" onClick={onShare}>⌘ Share</button>
-                        <button type="button" onClick={onSettings}>⚙ Settings</button>
-                        <button type="button" className="Header_Avatar" aria-label="User profile"></button>
+                        <button
+                            type="button"
+                            onClick={onSave}
+                        >
+                            ▣ Save
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={onExport}
+                        >
+                            ⇩ Export
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={onShare}
+                        >
+                            ⌘ Share
+                        </button>
+
+                        <div className="Header_Help_Wrapper">
+                            <button
+                                type="button"
+                                className="Header_Help_Button"
+                                aria-haspopup="menu"
+                            >
+                                <span
+                                    className="Header_Help_Icon"
+                                    aria-hidden="true"
+                                >
+                                    ?
+                                </span>
+
+                                <span>Help</span>
+                            </button>
+
+                            <div
+                                className="Header_Help_Menu"
+                                role="menu"
+                            >
+                                <div className="Header_Help_Menu_Card">
+                                    <button
+                                        type="button"
+                                        className="Header_Help_Menu_Item"
+                                        role="menuitem"
+                                    >
+                                        <span>View User Guide</span>
+
+                                        <span
+                                            className="Header_Help_Chevron"
+                                            aria-hidden="true"
+                                        >
+                                            ›
+                                        </span>
+                                    </button>
+
+                                    <div className="Header_Help_Menu_Divider" />
+
+                                    <button
+                                        type="button"
+                                        className="Header_Help_Menu_Item"
+                                        role="menuitem"
+                                        onClick={onFeedback}
+                                    >
+                                        <span>Feedback</span>
+
+                                        <span
+                                            className="Header_Help_Chevron"
+                                            aria-hidden="true"
+                                        >
+                                            ›
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={onSettings}
+                        >
+                            ⚙ Settings
+                        </button>
+
+                        <button
+                            type="button"
+                            className="Header_Avatar"
+                            aria-label="User profile"
+                        />
                     </div>
                 </div>
 
