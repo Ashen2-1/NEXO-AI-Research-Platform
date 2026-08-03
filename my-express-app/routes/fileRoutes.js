@@ -5,6 +5,7 @@ import path from "path";
 import FormData from "form-data";
 import axios from "axios";
 import authMiddleware from "../middleware/authMiddleware.js";
+import { uploadFileToSupabaseStorage } from "../utils/supabaseStorage.js";
 
 const router = express.Router();
 
@@ -161,14 +162,7 @@ const upload = multer({
     },
 });
 
-router.post(
-    "/ingest",
-    authMiddleware,
-    (req, res) => {
-        upload.single("file")(
-            req,
-            res,
-            async (uploadError) => {
+router.post("/ingest", authMiddleware, (req, res) => { upload.single("file")(req, res, async (uploadError) => {
                 if (uploadError) {
                     if (
                         uploadError instanceof
@@ -202,6 +196,29 @@ router.post(
                         });
                 }
 
+                const userId = String(req.user.id);
+                const canvasId = String(req.body.canvas_id || "default");
+
+                let storageResult = {
+                fileUrl: "",
+                storagePath: "",
+                warning: "",
+                };
+
+                try {
+                storageResult = await uploadFileToSupabaseStorage({
+                    localFilePath: req.file.path,
+                    userId,
+                    canvasId,
+                    originalName: req.file.originalname,
+                });
+                } catch (storageError) {
+                console.error("Storage upload failed:", storageError);
+
+                storageResult.warning =
+                    "The file was indexed, but the original preview file could not be saved permanently.";
+                }
+
                 const extension =
                     getFileExtension(
                         req.file.originalname
@@ -228,13 +245,17 @@ router.post(
                     });
                 }
 
-                const fileUrl =
+                const localFileUrl =
                     `${req.protocol}://${req.get(
                         "host"
                     )}/uploads/` +
                     encodeURIComponent(
                         req.file.filename
                     );
+
+                const fileUrl =
+                    storageResult.fileUrl ||
+                    localFileUrl;
 
                 const fastApiBaseUrl =
                     String(
@@ -384,6 +405,7 @@ router.post(
                                 .filename,
 
                         fileUrl,
+                        storagePath: storageResult.storagePath || "",
 
                         fileSize:
                             req.file.size,
@@ -396,7 +418,10 @@ router.post(
                         extension,
                         sourceType,
                         ingested,
-                        warning,
+                        warning:
+                            [storageResult.warning, warning]
+                                .filter(Boolean)
+                                .join("\n"),
                     });
             }
         );
