@@ -1449,6 +1449,79 @@ function CanvasBoard(){
         }
     };
 
+    const renderTextWithCitations = (value, sources = []) => {
+        if (typeof value !== "string") {
+            return value;
+        }
+
+        const parts = value.split(/(\[\s*S\d+(?:\s*,\s*S\d+)*\s*\])/gi);
+
+        return parts.map((part, index) => {
+            const groupMatch = part.match(/^\[\s*S\d+(?:\s*,\s*S\d+)*\s*\]$/i);
+
+            if (!groupMatch) {
+                return part;
+            }
+
+            const citationLabels = part.match(/S\d+/gi) || [];
+
+            return (
+                <span key={`${part}-${index}`} className="Citation_Group">
+                    [
+                    {citationLabels.map((label, labelIndex) => {
+                        const normalizedLabel = label.toUpperCase();
+                        const citationNumber = Number(normalizedLabel.replace("S", ""));
+
+                        const source =
+                            sources.find((item) => item.citation_id === normalizedLabel) ||
+                            sources[citationNumber - 1];
+
+                        if (!source) {
+                            return (
+                                <React.Fragment key={`${normalizedLabel}-${labelIndex}`}>
+                                    {labelIndex > 0 ? ", " : ""}
+                                    {normalizedLabel}
+                                </React.Fragment>
+                            );
+                        }
+
+                        return (
+                            <React.Fragment key={`${normalizedLabel}-${labelIndex}`}>
+                                {labelIndex > 0 ? ", " : ""}
+
+                                <button
+                                    type="button"
+                                    className="Citation_Button"
+                                    title={`${source.file || "Source"} · chunk ${source.chunk || ""}\n${source.preview || ""}`}
+                                    onClick={() => {
+                                        alert(
+                                            `${source.file || "Source"}\n` +
+                                            `Chunk ${source.chunk || ""}\n\n` +
+                                            `${source.text || source.preview || "No preview available."}`
+                                        );
+                                    }}
+                                >
+                                    {normalizedLabel}
+                                </button>
+                            </React.Fragment>
+                        );
+                    })}
+                    ]
+                </span>
+            );
+        });
+    };
+
+    const renderChildrenWithCitations = (children, sources = []) => {
+        return React.Children.map(children, (child) => {
+            if (typeof child === "string") {
+                return renderTextWithCitations(child, sources);
+            }
+
+            return child;
+        });
+    };
+
     const renderAiMarkdown = (text, sources = []) => {
         return (
             <ReactMarkdown
@@ -1456,67 +1529,19 @@ function CanvasBoard(){
                 rehypePlugins={[rehypeKatex]}
                 components={{
                     p({ children }) {
-                        const enhancedChildren = React.Children.map(children, (child) => {
-                            if (typeof child !== "string") {
-                                return child;
-                            }
+                        return (
+                            <p>
+                                {renderChildrenWithCitations(children, sources)}
+                            </p>
+                        );
+                    },
 
-                            const parts = child.split(/(\[S\d+(?:,\s*S\d+)*\])/g);
-
-                            return parts.map((part, index) => {
-                                const groupMatch = part.match(/^\[S\d+(?:,\s*S\d+)*\]$/);
-
-                                if (!groupMatch) {
-                                    return part;
-                                }
-
-                                const citationNumbers = part.match(/S\d+/g) || [];
-
-                                return (
-                                    <span key={`${part}-${index}`} className="Citation_Group">
-                                        {citationNumbers.map((citationLabel, citationIndex) => {
-                                            const citationNumber = Number(citationLabel.replace("S", ""));
-                                            const source = sources[citationNumber - 1];
-
-                                            if (!source) {
-                                                return (
-                                                    <span key={citationLabel}>
-                                                        {citationIndex > 0 ? ", " : "["}
-                                                        {citationLabel}
-                                                        {citationIndex === citationNumbers.length - 1 ? "]" : ""}
-                                                    </span>
-                                                );
-                                            }
-
-                                            return (
-                                                <React.Fragment key={`${citationLabel}-${citationIndex}`}>
-                                                    {citationIndex === 0 ? "[" : ", "}
-
-                                                    <button
-                                                        type="button"
-                                                        className="Citation_Button"
-                                                        title={`${source.file || "Source"} · chunk ${source.chunk || ""}\n${source.preview || ""}`}
-                                                        onClick={() => {
-                                                            alert(
-                                                                `${source.file || "Source"}\n` +
-                                                                `Chunk ${source.chunk || ""}\n\n` +
-                                                                `${source.text || source.preview || "No preview available."}`
-                                                            );
-                                                        }}
-                                                    >
-                                                        {citationLabel}
-                                                    </button>
-
-                                                    {citationIndex === citationNumbers.length - 1 ? "]" : ""}
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                    </span>
-                                );
-                            });
-                        });
-
-                        return <p>{enhancedChildren}</p>;
+                    li({ children }) {
+                        return (
+                            <li>
+                                {renderChildrenWithCitations(children, sources)}
+                            </li>
+                        );
                     },
                 }}
             >

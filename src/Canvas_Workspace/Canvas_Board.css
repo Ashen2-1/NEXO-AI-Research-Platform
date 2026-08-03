@@ -1884,3 +1884,26 @@ body,
     background: #111111;
     color: #ffffff;
 }
+
+.Citation_Group {
+    display: inline;
+    white-space: nowrap;
+}
+
+.Citation_Button {
+    border: none;
+    background: #eeeeee;
+    color: #111111;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 1px 5px;
+    margin: 0 1px;
+    border-radius: 5px;
+    cursor: pointer;
+    vertical-align: baseline;
+}
+
+.Citation_Button:hover {
+    background: #111111;
+    color: #ffffff;
+}
