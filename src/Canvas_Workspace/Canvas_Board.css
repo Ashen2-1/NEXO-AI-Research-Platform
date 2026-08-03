@@ -1885,6 +1885,8 @@ body,
     border-color: #b8b8b8;
     border-radius: 8px;
     box-shadow: none;
+}
+
 .Citation_Group {
     display: inline;
     white-space: nowrap;
