@@ -23,6 +23,7 @@ import { FaListOl } from "react-icons/fa";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 
 
 const FRAMEWORK_STORAGE_SOURCE = "__nexo_framework__";
