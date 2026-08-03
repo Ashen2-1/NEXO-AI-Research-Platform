@@ -276,6 +276,8 @@ function CanvasBoard(){
     const chatBottomRef = useRef(null);
     const expandedFrameworkEditorRef = useRef(null);
 
+    const previewCloseTimerRef = useRef(null);
+
     const [activeToolMode, setActiveToolMode] = useState("canvas");
 
     const [isFrameworkPanelOpen, setIsFrameworkPanelOpen] = useState(false);
@@ -952,6 +954,33 @@ function CanvasBoard(){
     
             return false;
         }
+    };
+
+    const cancelPreviewClose = () => {
+        if (
+            previewCloseTimerRef.current !== null
+        ) {
+            window.clearTimeout(
+                previewCloseTimerRef.current
+            );
+    
+            previewCloseTimerRef.current = null;
+        }
+    };
+    
+    const handlePreviewEnter = (noteId) => {
+        cancelPreviewClose();
+        setHoveredNoteId(noteId);
+    };
+    
+    const handlePreviewLeave = () => {
+        cancelPreviewClose();
+    
+        previewCloseTimerRef.current =
+            window.setTimeout(() => {
+                setHoveredNoteId(null);
+                previewCloseTimerRef.current = null;
+            }, 220);
     };
 
     /** When file upload success it will be package in the way we want so later can put into the PGSQL*/
@@ -3598,6 +3627,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
                     zoomHistoryTimerRef.current
                 );
             }
+
+            if (
+                previewCloseTimerRef.current !== null
+            ) {
+                window.clearTimeout(
+                    previewCloseTimerRef.current
+                );
+            }
         };
     }, []);
     /***************************************************************************/
@@ -4750,7 +4787,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     setHoveredNoteId(note.id)
                                 }
                                 onMouseLeave={() =>
-                                    setHoveredNoteId(null)
+                                    handlePreviewLeave
                                 }
                                 onClick={() => {
                                     if (!hasDraggedNote) {
@@ -4831,7 +4868,21 @@ ${frameworkEditorDraft.slice(0, 60000)}
                         ))}
 
                         {hoveredNote && (
-                            <div className="Note_Preview_Card" style={{left: `${hoveredNote.x + NOTE_WIDTH + 8}px`, top: `${hoveredNote.y}px`}} onMouseEnter={() => setHoveredNoteId(hoveredNote.id)} onMouseLeave={() => setHoveredNoteId(null)}>
+                            <div
+                                className="Note_Preview_Card"
+                                style={{
+                                    left: `${hoveredNote.x + NOTE_WIDTH + 8}px`,
+                                    top: `${hoveredNote.y}px`,
+                                }}
+                                onMouseEnter={() =>
+                                    handlePreviewEnter(
+                                        hoveredNote.id
+                                    )
+                                }
+                                onMouseLeave={
+                                    handlePreviewLeave
+                                }
+                            >
                                 <p className="Note_Preview_Label">
                                     {hoveredNote.noteKind === "outline" ? "OUTLINE" : "PAPER"}
                                 </p>
@@ -4857,7 +4908,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     }
                                 </p>
 
-                                <button className="Note_Preview_Button" onClick={() => handleOpenNote(hoveredNote)}>
+                                <button
+                                    className="Note_Preview_Button"
+                                    onClick={() => {
+                                        cancelPreviewClose();
+                                        setHoveredNoteId(null);
+                                        handleOpenNote(hoveredNote);
+                                    }}
+                                >
                                     OPEN NOTE
                                 </button>
                             </div>
