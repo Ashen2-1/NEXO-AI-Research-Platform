@@ -13,7 +13,7 @@ import linkRoutes from "./routes/linkRountes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
 import canvasRoutes from "./routes/canvasRoutes.js";
-app.use("/api/canvases", canvasRoutes);
+
 dotenv.config();
 
 const app = express();
@@ -102,10 +102,11 @@ app.get("/api/test", healthCheck);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/notes", noteRoutes);
-app.use("/api/documents", documentRoutes);
-app.use("/api/links", linkRoutes);
-app.use("/api/ai", aiRoutes);
 app.use("/api/files", fileRoutes);
+app.use("/api/ai", aiRoutes);
+app.use("/api/links", linkRoutes);
+app.use("/api/canvases", canvasRoutes);
+
 
 app.use((req, res) => {
     res.status(404).json({
