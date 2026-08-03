@@ -1910,13 +1910,11 @@ body,
 
 .Citation_Preview_Card {
     position: absolute;
+    right: calc(100% + 28px);
+    bottom: 120px;
 
-    /* float outside the chat panel, on top of the canvas */
-    right: calc(100% + 16px);
-    bottom: 84px;
-
-    width: clamp(320px, 28vw, 460px);
-    max-height: 520px;
+    width: clamp(340px, 30vw, 500px);
+    max-height: 560px;
     z-index: 80;
 
     border: 1px solid #d8d8d8;
@@ -1994,4 +1992,11 @@ body,
     padding: 1px 4px;
     border-radius: 4px;
     font-size: 12px;
+}
+
+.Citation_Preview_Note {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    color: #999999;
 }

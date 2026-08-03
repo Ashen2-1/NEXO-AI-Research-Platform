@@ -1469,7 +1469,6 @@ function CanvasBoard(){
 
             return (
                 <span key={`${part}-${index}`} className="Citation_Group">
-                    [
                     {citationLabels.map((label, labelIndex) => {
                         const normalizedLabel = label.toUpperCase();
                         const citationNumber = Number(normalizedLabel.replace("S", ""));
@@ -1478,32 +1477,25 @@ function CanvasBoard(){
                             sources.find((item) => item.citation_id === normalizedLabel) ||
                             sources[citationNumber - 1];
 
-                        if (!source) {
-                            return (
-                                <React.Fragment key={`${normalizedLabel}-${labelIndex}`}>
-                                    {labelIndex > 0 ? ", " : ""}
-                                    {normalizedLabel}
-                                </React.Fragment>
-                            );
-                        }
+                        const button = source ? (
+                            <button
+                                type="button"
+                                className="Citation_Button"
+                                onClick={() => setActiveCitationSource(source)}
+                            >
+                                {normalizedLabel}
+                            </button>
+                        ) : (
+                            normalizedLabel
+                        );
 
                         return (
                             <React.Fragment key={`${normalizedLabel}-${labelIndex}`}>
-                                {labelIndex > 0 ? ", " : ""}
-
-                                <button
-                                    type="button"
-                                    className="Citation_Button"
-                                    onClick={() => {
-                                        setActiveCitationSource(source);
-                                    }}
-                                >
-                                    {normalizedLabel}
-                                </button>
+                                {labelIndex > 0 ? " " : ""}
+                                [{button}]
                             </React.Fragment>
                         );
                     })}
-                    ]
                 </span>
             );
         });
@@ -4869,6 +4861,9 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                                     <p>Source Evidence</p>
                                                     <h3>{activeCitationSource.file || "Source"}</h3>
                                                     <span>Chunk {activeCitationSource.chunk || ""}</span>
+                                                    <span className="Citation_Preview_Note">
+                                                        Extracted text preview
+                                                    </span>
                                                 </div>
 
                                                 <button
