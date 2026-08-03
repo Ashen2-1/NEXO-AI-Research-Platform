@@ -2004,8 +2004,8 @@ body,
 /**Canvas Not Statuation********/
 .Canvas_Note_Status {
     display: inline-block;
-    margin-left: 6px;
-    padding: 1px 5px 1px 10px; /***********************/
+    margin-left: 20px;
+    padding: 1px 5px;
     border-radius: 999px;
     font-size: 9px;
     text-transform: uppercase;
