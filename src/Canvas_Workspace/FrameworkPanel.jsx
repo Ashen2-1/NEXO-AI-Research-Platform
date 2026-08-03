@@ -455,7 +455,7 @@ function FrameworkPanel({
                                     handleFrameworkCommand(event, "formatBlock", "paragraph")
                                 }
                             >
-                                Paragraph
+                                P
                             </button>
 
                             <button
