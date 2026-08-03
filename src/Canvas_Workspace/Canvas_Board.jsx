@@ -253,6 +253,17 @@ function CanvasBoard(){
 
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [showDatabaseSearch, setShowDatabaseSearch] = useState(false);
+
+    const [
+        isFeedbackOpen,
+        setIsFeedbackOpen,
+    ] = useState(false);
+    
+    const [
+        feedbackDraft,
+        setFeedbackDraft,
+    ] = useState("");
+
     const [chatInput, setChatInput] = useState("");
     const [chatMessages, setChatMessages] = useState([]);
     const [isAiThinking, setIsAiThinking] = useState(false);
@@ -3809,6 +3820,32 @@ ${frameworkEditorDraft.slice(0, 60000)}
     };
     /***************************************************************************/
     useEffect(() => {
+        if (!isFeedbackOpen) {
+            return;
+        }
+    
+        const handleFeedbackEscape = (
+            event
+        ) => {
+            if (event.key === "Escape") {
+                handleCloseFeedback();
+            }
+        };
+    
+        window.addEventListener(
+            "keydown",
+            handleFeedbackEscape
+        );
+    
+        return () => {
+            window.removeEventListener(
+                "keydown",
+                handleFeedbackEscape
+            );
+        };
+    }, [isFeedbackOpen]);
+    /***************************************************************************/
+    useEffect(() => {
         const editor = expandedFrameworkEditorRef.current;
     
         if (!isFrameworkExpanded || !editor) {
@@ -4802,6 +4839,25 @@ ${frameworkEditorDraft.slice(0, 60000)}
         alert("Settings will be added later.");
     };
 
+    const handleOpenFeedback = () => {
+        setIsFeedbackOpen(true);
+    };
+    
+    const handleCloseFeedback = () => {
+        setIsFeedbackOpen(false);
+        setFeedbackDraft("");
+    };
+    
+    const handleSubmitFeedback = (event) => {
+        event.preventDefault();
+    
+        /*
+         * Layout-only placeholder.
+         * No backend request is made yet.
+         */
+        handleCloseFeedback();
+    };
+
     const handleSelectAll = () => {
         const visibleIds = new Set(
             visibleNotes.map((note) =>
@@ -4912,6 +4968,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                 onSave={handleSaveProject}
                 onExport={handleExportProject}
                 onShare={handleShareProject}
+                onFeedback={handleOpenFeedback}
                 onSettings={handleOpenSettings}
             />
             <main className="Canvas_Main">
@@ -5007,7 +5064,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     setHoveredNoteId(note.id)
                                 }
                                 onMouseLeave={() =>
-                                    handlePreviewLeave
+                                    handlePreviewLeave()
                                 }
                                 onClick={() => {
                                     if (!hasDraggedNote) {
@@ -5343,6 +5400,91 @@ ${frameworkEditorDraft.slice(0, 60000)}
             </main>
             <UploadFile showModal={showUploadModal} onClose={() => setShowUploadModal(false)} onUploadSuccess={handleUploadSuccess}/>
             <DatabaseSearch showModal={showDatabaseSearch} onClose={() => setShowDatabaseSearch(false)} onSendToBoard={handleSendDocToBoard}/>
+            
+            {isFeedbackOpen && (
+                <div
+                    className="Feedback_Modal_Overlay"
+                    onClick={(event) => {
+                        if (
+                            event.target ===
+                            event.currentTarget
+                        ) {
+                            handleCloseFeedback();
+                        }
+                    }}
+                >
+                    <form
+                        className="Feedback_Modal"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="feedback-modal-title"
+                        onSubmit={handleSubmitFeedback}
+                    >
+                        <div className="Feedback_Modal_Header">
+                            <h2 id="feedback-modal-title">
+                                Send Feedback
+                            </h2>
+
+                            <button
+                                type="button"
+                                className="Feedback_Modal_Close"
+                                onClick={handleCloseFeedback}
+                                aria-label="Close feedback form"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <p className="Feedback_Modal_Intro">
+                            Tell us what’s working—or what
+                            could be better.
+                        </p>
+
+                        <label
+                            className="Feedback_Field_Label"
+                            htmlFor="feedback-message"
+                        >
+                            Your feedback
+                        </label>
+
+                        <textarea
+                            id="feedback-message"
+                            className="Feedback_Textarea"
+                            value={feedbackDraft}
+                            onChange={(event) =>
+                                setFeedbackDraft(
+                                    event.currentTarget.value
+                                )
+                            }
+                            placeholder="What’s working? What feels confusing? Tell us what you’d improve..."
+                            autoFocus
+                        />
+
+                        <p className="Feedback_Privacy_Note">
+                            Please don’t include passwords or
+                            sensitive information.
+                        </p>
+
+                        <div className="Feedback_Modal_Actions">
+                            <button
+                                type="button"
+                                className="Feedback_Cancel_Button"
+                                onClick={handleCloseFeedback}
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="submit"
+                                className="Feedback_Send_Button"
+                            >
+                                Send Feedback
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+            
             {openedNote && (
                 <div className="Note_Modal_Overlay">
                     <div className="Note_Modal">
