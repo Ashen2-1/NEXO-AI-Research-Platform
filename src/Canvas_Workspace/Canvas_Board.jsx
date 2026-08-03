@@ -1249,40 +1249,20 @@ function CanvasBoard(){
                     data.note
                 );
 
-            setNotes((prevNotes) => {
-                if (temporaryUploadId) {
-                    return prevNotes.map((note) =>
-                        note.id === temporaryUploadId
-                            ? {
-                                ...newCanvasNote,
-                                selected: note.selected,
-                            }
-                            : note
-                    );
-                }
-
-                return [...prevNotes, newCanvasNote];
-            });
+            setNotes((prevNotes) => [
+                ...prevNotes,
+                newCanvasNote,
+            ]);
 
             const newCabinetFile =
                 convertNoteToCabinetFile(
                     newCanvasNote
                 );
 
-            setFiles((prevFiles) => {
-                if (temporaryUploadId) {
-                    return prevFiles.map((file) =>
-                        file.noteId === temporaryUploadId
-                            ? {
-                                ...newCabinetFile,
-                                noteId: newCanvasNote.id,
-                            }
-                            : file
-                    );
-                }
-
-                return [newCabinetFile, ...prevFiles];
-            });
+            setFiles((prevFiles) => [
+                newCabinetFile,
+                ...prevFiles,
+            ]);
 
             pushUndoSnapshot(before);
         } catch (error) {

@@ -154,7 +154,7 @@ const getFileExtension = (
     setDragging(false);
   };
 
-  const uploadSingleFile = (fileToUpload, fileIndex, totalFiles) => {
+  const uploadSingleFile = (fileToUpload, fileIndex, totalFiles, shouldTrackProgress = true) => {
     return new Promise((resolve, reject) => {
       const formData = new FormData();
       formData.append("file", fileToUpload);
@@ -170,7 +170,7 @@ const getFileExtension = (
       }
 
       xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
+        if (shouldTrackProgress && event.lengthComputable) {
           const singleFilePercent = event.loaded / event.total;
           const totalPercent = Math.round(
             ((fileIndex + singleFilePercent) / totalFiles) * 100
@@ -212,7 +212,45 @@ const getFileExtension = (
     });
   };
 
-  const uploadToBackend = async () => {
+  const runUploadQueue = async (uploadJobs) => {
+    for (let index = 0; index < uploadJobs.length; index++) {
+      const job = uploadJobs[index];
+
+      try {
+        const result = await uploadSingleFile(
+          job.file,
+          index,
+          uploadJobs.length,
+          false
+        );
+
+        if (onUploadSuccess) {
+          onUploadSuccess(job.file, {
+            ...result,
+            success: true,
+            temporaryUploadId: job.temporaryUploadId,
+            ingestStatus: result?.ingested ? "indexed" : "uploaded",
+          });
+        }
+      } catch (error) {
+        console.error("Upload failed:", job.file.name, error);
+
+        if (onUploadSuccess) {
+          onUploadSuccess(job.file, {
+            success: false,
+            temporaryUploadId: job.temporaryUploadId,
+            ingestStatus: "failed",
+            file: job.file.name,
+            originalName: job.file.name,
+            fileSize: job.file.size,
+            error: error.message || "Upload failed",
+          });
+        }
+      }
+    }
+  };
+
+  const uploadToBackend = () => {
     if (isUploading) {
       return;
     }
@@ -222,63 +260,33 @@ const getFileExtension = (
       return;
     }
 
+    const filesToUpload = [...selectedFiles];
+
+    const uploadJobs = filesToUpload.map((currentFile, index) => ({
+      file: currentFile,
+      temporaryUploadId: `${currentFile.name}-${currentFile.size}-${Date.now()}-${index}`,
+    }));
+
     setIsUploading(true);
+    setProgress(0);
 
-    const totalFiles = selectedFiles.length;
-    const uploadedResults = [];
-
-    for (let index = 0; index < selectedFiles.length; index++) {
-      const currentFile = selectedFiles[index];
-
-      const fileBaseProgress = Math.round((index / totalFiles) * 100);
-      setProgress(fileBaseProgress);
-
-      try {
-        const temporaryUploadId = `${currentFile.name}-${currentFile.size}-${Date.now()}-${index}`;
-
-        if (onUploadSuccess) {
-          onUploadSuccess(currentFile, {
-            success: true,
-            temporaryUploadId,
-            ingested: false,
-            ingestStatus: "indexing",
-            file: currentFile.name,
-            originalName: currentFile.name,
-            fileSize: currentFile.size,
-          });
-        }
-
-        const result = await uploadSingleFile(currentFile, index, totalFiles);
-
-        if (onUploadSuccess) {
-          onUploadSuccess(currentFile, {
-            ...result,
-            success: true,
-            temporaryUploadId,
-            ingestStatus: result?.ingested ? "indexed" : "uploaded",
-          });
-        }
-      } catch (error) {
-        console.error("Upload failed:", currentFile.name, error);
-
-        if (onUploadSuccess) {
-          onUploadSuccess(currentFile, {
-            success: false,
-            temporaryUploadId,
-            ingestStatus: "failed",
-            file: currentFile.name,
-            originalName: currentFile.name,
-            fileSize: currentFile.size,
-            error: error.message || "Upload failed",
-          });
-        }
+    uploadJobs.forEach((job) => {
+      if (onUploadSuccess) {
+        onUploadSuccess(job.file, {
+          success: true,
+          temporaryUploadId: job.temporaryUploadId,
+          ingested: false,
+          ingestStatus: "indexing",
+          file: job.file.name,
+          originalName: job.file.name,
+          fileSize: job.file.size,
+        });
       }
-    }
-
-    setIsUploading(false);
-    setProgress(100);
+    });
 
     closeModal(true);
+
+    runUploadQueue(uploadJobs);
   };
 
   if (!showModal) {
