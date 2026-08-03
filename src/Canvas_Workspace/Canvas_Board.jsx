@@ -1622,7 +1622,7 @@ function CanvasBoard(){
         }
     };
 
-    const renderTextWithCitations = (value, sources = []) => {
+    const renderTextWithCitations = (value, sources = [], onCitationClick = setActiveCitationSource) => {
         if (typeof value !== "string") {
             return value;
         }
@@ -1652,7 +1652,7 @@ function CanvasBoard(){
                             <button
                                 type="button"
                                 className="Citation_Button"
-                                onClick={() => setActiveCitationSource(source)}
+                                onClick={() => onCitationClick(source)}
                             >
                                 {normalizedLabel}
                             </button>
@@ -1672,17 +1672,17 @@ function CanvasBoard(){
         });
     };
 
-    const renderChildrenWithCitations = (children, sources = []) => {
+    const renderChildrenWithCitations = (children, sources = [], onCitationClick = setActiveCitationSource) => {
         return React.Children.map(children, (child) => {
             if (typeof child === "string") {
                 return renderTextWithCitations(child, sources);
             }
 
-            return child;
+            return renderTextWithCitations(child, sources, onCitationClick);
         });
     };
 
-    const renderAiMarkdown = (text, sources = []) => {
+    const renderAiMarkdown = (text, sources = [], onCitationClick = setActiveCitationSource) => {
         return (
             <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
@@ -1691,7 +1691,7 @@ function CanvasBoard(){
                     p({ children }) {
                         return (
                             <p>
-                                {renderChildrenWithCitations(children, sources)}
+                                {renderChildrenWithCitations(children, sources, onCitationClick)}
                             </p>
                         );
                     },
@@ -1699,7 +1699,7 @@ function CanvasBoard(){
                     li({ children }) {
                         return (
                             <li>
-                                {renderChildrenWithCitations(children, sources)}
+                                {renderChildrenWithCitations(children, sources, onCitationClick)}
                             </li>
                         );
                     },

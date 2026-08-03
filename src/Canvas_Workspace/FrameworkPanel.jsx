@@ -132,6 +132,8 @@ function FrameworkPanel({
     renderAiMarkdown,
 }) {
     const frameworkEditorRef = useRef(null);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [frameworkCitationSource, setFrameworkCitationSource] = useState(null);
 
     const [
         frameworkFormatState,
@@ -235,6 +237,18 @@ function FrameworkPanel({
             event.preventDefault();
             onRefine();
         }
+    };
+
+    const renderFrameworkPreview = () => {
+        if (!renderAiMarkdown) {
+            return frameworkEditorDraft;
+        }
+
+        return renderAiMarkdown(
+            frameworkEditorDraft,
+            currentFramework?.citationSources || [],
+            setFrameworkCitationSource
+        );
     };
 
     return (
@@ -418,6 +432,17 @@ function FrameworkPanel({
                                 <button type="button" onClick={onCreateNew}>
                                     + New
                                 </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setFrameworkCitationSource(null);
+                                        setIsPreviewOpen(true);
+                                    }}
+                                >
+                                    Preview
+                                </button>
+
                                 <button type="button" onClick={onExpand}>
                                     ↗ Expand
                                 </button>
@@ -540,21 +565,6 @@ function FrameworkPanel({
                                 ↶
                             </button>
                         </div>
-                        {renderAiMarkdown &&
-                            currentFramework?.citationSources?.length > 0 && (
-                                <div className="Framework_Citation_Preview">
-                                    <div className="Framework_Citation_Preview_Header">
-                                        Evidence-linked Preview
-                                    </div>
-
-                                    <div className="Framework_Citation_Preview_Body">
-                                        {renderAiMarkdown(
-                                            frameworkEditorDraft,
-                                            currentFramework.citationSources || []
-                                        )}
-                                    </div>
-                                </div>
-                            )}
                         <div
                             ref={frameworkEditorRef}
                             className="Framework_Editor_Content"
@@ -629,6 +639,63 @@ function FrameworkPanel({
                                     : "Convert to Outline"}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {isPreviewOpen && (
+                <div className="Framework_Preview_Overlay">
+                    <div className="Framework_Preview_Modal">
+                        <div className="Framework_Preview_Header">
+                            <div>
+                                <p>MARKDOWN PREVIEW</p>
+                                <h3>{currentFramework?.title || "Framework Preview"}</h3>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setFrameworkCitationSource(null);
+                                    setIsPreviewOpen(false);
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="Framework_Preview_Body">
+                            {renderAiMarkdown
+                                ? renderAiMarkdown(
+                                    frameworkEditorDraft,
+                                    currentFramework?.citationSources || [],
+                                    setFrameworkCitationSource
+                                )
+                                : frameworkEditorDraft}
+                        </div>
+
+                        {frameworkCitationSource && (
+                            <div className="Framework_Preview_Evidence">
+                                <div className="Framework_Preview_Evidence_Header">
+                                    <div>
+                                        <p>Source Evidence</p>
+                                        <h4>{frameworkCitationSource.file || "Source"}</h4>
+                                        <span>Chunk {frameworkCitationSource.chunk || ""}</span>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setFrameworkCitationSource(null)}
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+
+                                <div className="Framework_Preview_Evidence_Body">
+                                    {frameworkCitationSource.text ||
+                                        frameworkCitationSource.preview ||
+                                        "No preview available."}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
