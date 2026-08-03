@@ -12,7 +12,8 @@ import documentRoutes from "./routes/documentRoutes.js";
 import linkRoutes from "./routes/linkRountes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
-
+import canvasRoutes from "./routes/canvasRoutes.js";
+app.use("/api/canvases", canvasRoutes);
 dotenv.config();
 
 const app = express();

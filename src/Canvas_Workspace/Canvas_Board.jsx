@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import Header from "./Header.jsx";
 import UploadFile from "../Upload_Section/uploadFile.jsx";
 import DatabaseSearch from "../Upload_Section/databaseSearch.jsx";
@@ -186,6 +187,8 @@ const getCanvasNoteTypeLabel = (
 };
 
 function CanvasBoard(){
+    const { canvasId } = useParams();
+    const currentCanvasId = canvasId || "default";
 
     const currentUser = JSON.parse(localStorage.getItem("nexo_user") || "null");
 

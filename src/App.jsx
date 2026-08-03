@@ -1,56 +1,49 @@
-import Header from './Header.jsx'
-import HomeCard from './HomeCards.jsx';
-import TodayArtworkSection from './TodaysArtworkSeaction.jsx';
-import HomeGridCard from './HomeGridCard.jsx';
-import SearchButton from './SearchButton.jsx'; 
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import SearchPage from './SearchPage.jsx';
-import HomePage from './HomePage.jsx';
-import DailyArtworkPage from './pages/dailyartworkpage/DailyArtworkPage.jsx';
-import ArticlePage from './pages/articlepage/ArticlePage.jsx';
-import ArtThreadsPage from './pages/artthreadspage/ArtThreadsPage.jsx';
+import {BrowserRouter, Routes, Route, Navigate,} from "react-router-dom";
 
-////////////////// New
-import CanvasPage from "./Canvas_Workspace/Canvas_Board.jsx";
 import LoginPage from "./Auth/LoginPage.jsx";
-import ProtectedRoute from './Auth/ProtectedRoute.jsx';
-///////images
-import DailyArtwork from './assets/DailyArtwork.png'
-import ArtMap from './assets/ArtMap.png'
-import ArtThreads from './assets/ArtThreads.png'
-import StarterPack from './assets/StarterPack.png'
-
-import HomeGridCard1 from './assets/HomeGridCard1.png'
-import HomeGridCard2 from './assets/HomeGridCard2.png'
-import HomeGridCard3 from './assets/HomeGridCard3.png'
-import HomeGridCard4 from './assets/HomeGridCard4.png'
+import ProtectedRoute from "./Auth/ProtectedRoute.jsx";
+import Dashboard from "./Dashboard/Dashboard.jsx";
+import CanvasBoard from "./Canvas_Workspace/Canvas_Board.jsx";
 
 function App() {
-    return(
-      
-      <Router>
-        <div>
-          
-          <Routes>
-            <Route path="/" element={
-              <ProtectedRoute>
-                <CanvasPage/>
-              </ProtectedRoute>
-            } />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/" element={<HomePage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/DailyArtworkPage" element={<DailyArtworkPage />} />
-            <Route path="/ArticlePage" element={<ArticlePage />} />
-            <Route path="/ArtThreadsPage" element={<ArtThreadsPage />} />
-            
-          </Routes>
-        </div>
-      </Router>
-    );
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/login"
+          element={<LoginPage />}
+        />
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/workspace/:canvasId"
+          element={
+            <ProtectedRoute>
+              <CanvasBoard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/"
+          element={<Navigate to="/dashboard" replace />}
+        />
+
+        <Route
+          path="*"
+          element={<Navigate to="/dashboard" replace />}
+        />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
-
-
-// test update
+export default App;
