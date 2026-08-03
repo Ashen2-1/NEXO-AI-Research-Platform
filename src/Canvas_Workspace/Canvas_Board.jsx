@@ -200,6 +200,7 @@ function CanvasBoard(){
     const editorRef = useRef(null);
     const chatBottomRef = useRef(null);
     const expandedFrameworkEditorRef = useRef(null);
+    const [activeCitationSource, setActiveCitationSource] = useState(null);
 
     const [activeToolMode, setActiveToolMode] = useState("canvas");
 
@@ -1492,13 +1493,8 @@ function CanvasBoard(){
                                 <button
                                     type="button"
                                     className="Citation_Button"
-                                    title={`${source.file || "Source"} · chunk ${source.chunk || ""}\n${source.preview || ""}`}
                                     onClick={() => {
-                                        alert(
-                                            `${source.file || "Source"}\n` +
-                                            `Chunk ${source.chunk || ""}\n\n` +
-                                            `${source.text || source.preview || "No preview available."}`
-                                        );
+                                        setActiveCitationSource(source);
                                     }}
                                 >
                                     {normalizedLabel}
@@ -4860,7 +4856,33 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                                         </div>
                                                     </div>
                                                 )}
+                                                {activeCitationSource && (
+                                                    <div className="Citation_Preview_Card">
+                                                        <div className="Citation_Preview_Header">
+                                                            <div>
+                                                                <p>Source Evidence</p>
+                                                                <h3>{activeCitationSource.file || "Source"}</h3>
+                                                                <span>Chunk {activeCitationSource.chunk || ""}</span>
+                                                            </div>
 
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setActiveCitationSource(null)}
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="Citation_Preview_Body">
+                                                            <ReactMarkdown
+                                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                                rehypePlugins={[rehypeKatex]}
+                                                            >
+                                                                {activeCitationSource.text || activeCitationSource.preview || "No preview available."}
+                                                            </ReactMarkdown>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <div ref={chatBottomRef} />
                                             </div>
                                         )}
