@@ -1425,13 +1425,12 @@ function CanvasBoard(){
                     (note) =>
                         note.selected &&
                         note.sourceName &&
-                        note.sourceType !==
-                            "openalex"
+                        note.sourceType !== "openalex" &&
+                        note.ingestStatus !== "indexing" &&
+                        note.ingestStatus !== "failed" &&
+                        !note.isTemporary
                 )
-                .map(
-                    (note) =>
-                        note.sourceName
-                );
+                .map((note) => note.sourceName);
 
             const uniqueSelectedSourceNames = [...new Set(selectedSourceNames)];
 
@@ -1924,24 +1923,25 @@ function CanvasBoard(){
                 dragInfo.noteIds
                     .map((noteId) => {
                         const startPosition =
-                            dragInfo.startPositions[
-                                noteId
-                            ];
+                            dragInfo.startPositions[noteId];
 
                         if (!startPosition) {
                             return null;
                         }
 
+                        const currentNote = notes.find(
+                            (note) => String(note.id) === String(noteId)
+                        );
+
+                        if (!currentNote) {
+                            return null;
+                        }
+
                         return {
                             id: noteId,
-
-                            x:
-                                startPosition.x +
-                                dragInfo.lastDeltaX,
-
-                            y:
-                                startPosition.y +
-                                dragInfo.lastDeltaY,
+                            x: startPosition.x + dragInfo.lastDeltaX,
+                            y: startPosition.y + dragInfo.lastDeltaY,
+                            isTemporary: Boolean(currentNote.isTemporary),
                         };
                     })
                     .filter(Boolean);
@@ -1950,9 +1950,17 @@ function CanvasBoard(){
                 return;
             }
 
+            const databaseMovedNotes = movedNotes.filter(
+                (note) => !note.isTemporary
+            );
+
+            if (databaseMovedNotes.length === 0) {
+                return;
+            }
+
             const updateResults =
                 await Promise.all(
-                    movedNotes.map((note) =>
+                    databaseMovedNotes.map((note) =>
                         updateNoteInDatabase(
                             note.id,
                             {
