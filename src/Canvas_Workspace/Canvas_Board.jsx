@@ -3319,14 +3319,23 @@ function CanvasBoard(){
     - Return clean Markdown only.
     - Do not include a conversational introduction.
     - Begin with "# Research Framework".
-    - Include a focused research question.
-    - Include a working argument or hypothesis.
+    - First identify the likely academic domain of the selected material.
+    - Adapt the framework structure to that domain:
+        - Engineering / computer science: problem, method, assumptions, system design, evaluation, limitations.
+        - Science / physics / chemistry / biology: key concepts, mechanisms, equations, evidence, examples, limitations.
+        - Mathematics: definitions, claims, proof strategy, worked examples, assumptions, gaps.
+        - Humanities / arts: themes, context, formal analysis, interpretation, evidence, counterarguments.
+        - Business / policy: problem, stakeholders, options, risks, implementation, metrics.
+    - Include a focused research question or learning question.
+    - Include a working argument, hypothesis, or analytical direction.
     - Organize the framework into numbered sections.
     - Connect every major claim to evidence from the selected materials.
-    - Cite sources using their actual filenames.
-    - Do not invent quotations, evidence, authors, methods, or results.
+    - Use citation IDs such as [S1], [S2], [S3] for evidence.
+    - Do not cite sources that were not retrieved.
+    - Do not invent quotations, evidence, authors, methods, results, formulas, or page details.
     - Write "NEEDS EVIDENCE" where the selected material is insufficient.
-    - End with research gaps and recommended next steps.
+    - If the selected source is homework, quiz, exam, or graded assignment material, do not provide final answers. Build a study framework, concept map, and step-by-step learning plan instead.
+    - End with research gaps, study gaps, or recommended next steps.
             `.trim();
 
             const result = await requestAiText({
