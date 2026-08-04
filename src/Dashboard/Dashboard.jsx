@@ -406,11 +406,19 @@ function Dashboard() {
                 </div>
 
                 {projects.map((project) => (
-                    <button
-                    key={project.id}
-                    type="button"
-                    className="Dashboard_List_Row"
-                    onClick={() => handleOpenProject(project)}
+                    <div
+                        key={project.id}
+                        role="button"
+                        tabIndex={0}
+                        className={`Dashboard_List_Row ${
+                            openProjectMenuId === project.id ? "Menu_Open" : ""
+                        }`}
+                        onClick={() => handleOpenProject(project)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                            handleOpenProject(project);
+                            }
+                        }}
                     >
                     <div className="Dashboard_List_Project">
                         <div className="Dashboard_List_Thumb">
@@ -431,8 +439,50 @@ function Dashboard() {
                     <span>{project.sources}</span>
                     <span>{project.lastOpened}</span>
                     <span>● {project.access}</span>
-                    <span>•••</span>
-                    </button>
+                    <div className="Dashboard_Project_Menu_Wrap">
+                        <button
+                            type="button"
+                            className="Dashboard_Project_Menu"
+                            onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenProjectMenuId((currentId) =>
+                                currentId === project.id ? null : project.id
+                            );
+                            }}
+                        >
+                            •••
+                        </button>
+
+                        {openProjectMenuId === project.id && (
+                            <div
+                            className="Dashboard_Project_Menu_Dropdown"
+                            onClick={(event) => event.stopPropagation()}
+                            >
+                            <button
+                                type="button"
+                                onClick={() => {
+                                setProjectToRename(project);
+                                setRenameDraft(project.title);
+                                setOpenProjectMenuId(null);
+                                }}
+                            >
+                                Rename
+                            </button>
+
+                            <button
+                                type="button"
+                                className="Danger"
+                                onClick={() => {
+                                setProjectToDelete(project);
+                                setOpenProjectMenuId(null);
+                                }}
+                            >
+                                Delete
+                            </button>
+                            </div>
+                        )}
+                        </div>
+                    </div>
                 ))}
                 </div>
             ))}
