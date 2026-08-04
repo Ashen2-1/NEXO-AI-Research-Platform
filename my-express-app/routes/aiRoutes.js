@@ -29,21 +29,39 @@ const buildFastApiHeaders = () => {
 };
 
 const parseUpstreamResponse = async (response) => {
-    const responseText = await response.text();
+  const responseText = await response.text();
 
-    if (!responseText) {
-        return {};
-    }
+  if (!responseText) {
+    return {};
+  }
 
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
     try {
-        return JSON.parse(responseText);
+      return JSON.parse(responseText);
     } catch {
-        return {
-            detail: responseText
-                .replace(/\s+/g, " ")
-                .slice(0, 500),
-        };
+      return {
+        detail: "AI service returned invalid JSON.",
+      };
     }
+  }
+
+  const looksLikeHtml =
+    responseText.includes("<!DOCTYPE html") ||
+    responseText.includes("<html") ||
+    responseText.includes("<title>502</title>");
+
+  if (looksLikeHtml) {
+    return {
+      detail:
+        "AI service is temporarily unavailable. The RAG server returned an HTML error page instead of JSON.",
+    };
+  }
+
+  return {
+    detail: responseText.replace(/\s+/g, " ").slice(0, 500),
+  };
 };
 
 const normalizeChatHistory = (history) => {

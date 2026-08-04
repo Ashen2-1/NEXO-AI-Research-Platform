@@ -61,23 +61,36 @@ const getSourceType = (
     );
 };
 
-const getFastApiErrorMessage = (
-    error
-) => {
-    const detail =
-        error.response?.data?.detail ??
-        error.response?.data?.error ??
-        error.message;
+const getFastApiErrorMessage = (error) => {
+  const status = error.response?.status;
 
-    if (typeof detail === "string") {
-        return detail;
-    }
+  const detail =
+    error.response?.data?.detail ??
+    error.response?.data?.error ??
+    error.response?.data ??
+    error.message;
 
-    try {
-        return JSON.stringify(detail);
-    } catch {
-        return "Unknown ingestion error.";
-    }
+  const rawMessage =
+    typeof detail === "string"
+      ? detail
+      : (() => {
+          try {
+            return JSON.stringify(detail);
+          } catch {
+            return "Unknown ingestion error.";
+          }
+        })();
+
+  const looksLikeHtml =
+    rawMessage.includes("<!DOCTYPE html") ||
+    rawMessage.includes("<html") ||
+    rawMessage.includes("<title>502</title>");
+
+  if (looksLikeHtml) {
+    return `AI ingestion service is temporarily unavailable${status ? ` (${status})` : ""}. Please check the nexo-rag-api Render logs.`;
+  }
+
+  return rawMessage.replace(/\s+/g, " ").slice(0, 500);
 };
 
 const storage =
@@ -353,6 +366,7 @@ router.post("/ingest", authMiddleware, (req, res) => { upload.single("file")(req
 
                                     maxContentLength:
                                         Infinity,
+                                    timeout: 180000,
                                 }
                             );
 
