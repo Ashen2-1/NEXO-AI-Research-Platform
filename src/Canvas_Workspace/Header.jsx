@@ -49,6 +49,7 @@ function Header({
     onShare,
     onFeedback,
     onSettings,
+    onLogoClick,
 }) {
     const isCanvasMode = activeToolMode === "canvas";
     const isResearchMode = activeToolMode === "research";
@@ -59,7 +60,14 @@ function Header({
                 <div className="Header_Top_Row">
                     <div className="Header_Brand_Area">
                         <div className="Header_Project_Block">
-                            <h1>{projectName}</h1>
+                            <button
+                                type="button"
+                                className="Header_Logo_Button"
+                                onClick={onLogoClick}
+                                title="Back to Dashboard"
+                            >
+                                {projectName}
+                            </button>
                             <span>{projectSubtitle}</span>
                             <p>{saveStatus}</p>
                         </div>

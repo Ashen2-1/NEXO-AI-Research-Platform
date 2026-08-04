@@ -71,7 +71,8 @@ function Dashboard() {
         ];
 
     const handleCreateProject = () => {
-        navigate("/workspace/default");
+        const newCanvasId = `canvas-${Date.now()}`;
+        navigate(`/workspace/${newCanvasId}`);
     };
 
     const handleOpenProject = (project) => {
@@ -88,10 +89,10 @@ function Dashboard() {
     return (
         <div className="Dashboard_Page">
         <header className="Dashboard_Header">
-            <div className="Dashboard_Logo_Block">
-            <h1>NEXO</h1>
-            <p>RESEARCH WORKSPACE</p>
-            </div>
+            <button type="button" className="Dashboard_Logo_Block" onClick={() => navigate("/dashboard")}>
+                <h1>NEXO</h1>
+                <p>RESEARCH WORKSPACE</p>
+            </button>
 
             <input
             className="Dashboard_Search"
@@ -185,11 +186,17 @@ function Dashboard() {
             {viewMode === "grid" ? (
                 <div className="Dashboard_Project_Grid">
                 {projects.map((project) => (
-                    <button
-                    key={project.id}
-                    type="button"
-                    className="Dashboard_Project_Card"
-                    onClick={() => handleOpenProject(project)}
+                    <div
+                        key={project.id}
+                        role="button"
+                        tabIndex={0}
+                        className="Dashboard_Project_Card"
+                        onClick={() => handleOpenProject(project)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                            handleOpenProject(project);
+                            }
+                        }}
                     >
                     <div className={`Dashboard_Project_Thumbnail Theme_${project.theme}`}>
                         <div className="Thumb_Lines"></div>
@@ -212,9 +219,16 @@ function Dashboard() {
                         </div>
                         </div>
 
-                        <span>•••</span>
+                        <button type="button" className="Dashboard_Project_Menu" 
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                alert("Project menu coming soon.");
+                            }}
+                        >
+                            •••
+                        </button>
                     </div>
-                    </button>
+                    </div>
                 ))}
                 </div>
             ) : (

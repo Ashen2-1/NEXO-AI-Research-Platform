@@ -72,7 +72,7 @@
 }
 
 .Dashboard_Main {
-  max-width: 1360px;
+  max-width: 1480px;
   margin: 0 auto;
   background: #fff;
   min-height: calc(100vh - 72px);
@@ -520,4 +520,31 @@
 .Theme_interface .Thumb_Lines {
   left: 14%;
   top: 72px;
+}
+
+
+.Dashboard_Logo_Block {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.Dashboard_Logo_Block:hover {
+  opacity: 0.7;
+}
+
+
+.Dashboard_Project_Menu {
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.Dashboard_Project_Menu:hover {
+  background: #eeeeee;
 }
