@@ -6,86 +6,109 @@ function Dashboard() {
     const navigate = useNavigate();
     const [viewMode, setViewMode] = useState("grid");
 
-    const projects = [
-        {
-            id: "default",
-            title: "Photography and Evidence",
-            owner: "You",
-            sources: 12,
-            lastOpened: "Today, 9:42 PM",
-            access: "Private",
-            pinned: true,
-            updated: "Updated today",
-            theme: "cards",
-        },
-        {
-            id: "modern-design",
-            title: "Emptiness in Modern Design",
-            owner: "You + 2",
-            sources: 8,
-            lastOpened: "Yesterday",
-            access: "Shared",
-            updated: "Updated yesterday",
-            theme: "minimal",
-        },
-        {
-            id: "archive-politics",
-            title: "Visual Politics of the Archive",
-            owner: "You",
-            sources: 17,
-            lastOpened: "Jul 22",
-            access: "Private",
-            updated: "Updated Jul 22",
-            theme: "archive",
-        },
-        {
-            id: "ways-of-seeing",
-            title: "Ways of Seeing — Seminar Notes",
-            owner: "Maya Chen",
-            sources: 5,
-            lastOpened: "Jul 18",
-            access: "Shared",
-            updated: "Updated Jul 18",
-            theme: "notes",
-        },
-        {
-            id: "renaissance-networks",
-            title: "Renaissance Workshop Networks",
-            owner: "You",
-            sources: 21,
-            lastOpened: "Jul 12",
-            access: "Private",
-            updated: "Updated Jul 12",
-            theme: "network",
-        },
-        {
-            id: "museum-interface",
-            title: "Museum Interface Study",
-            owner: "You",
-            sources: 9,
-            lastOpened: "Jun 30",
-            access: "Private",
-            updated: "Updated Jun 30",
-            theme: "interface",
-        },
-        ];
+    const [projects, setProjects] = useState([]);
+    const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+    const [dashboardError, setDashboardError] = useState("");
 
-    const handleCreateProject = () => {
-        const newCanvasId = `canvas-${Date.now()}`;
-        navigate(`/workspace/${newCanvasId}`);
+    const formatDashboardDate = (value) => {
+        if (!value) {
+            return "Recently";
+        }
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return "Recently";
+        }
+
+        const today = new Date();
+        const sameDay =
+            date.getFullYear() === today.getFullYear() &&
+            date.getMonth() === today.getMonth() &&
+            date.getDate() === today.getDate();
+
+        if (sameDay) {
+            return "Today";
+        }
+
+        return date.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+        });
     };
 
-    const handleOpenProject = (project) => {
+    const loadProjects = async () => {
+        setIsLoadingProjects(true);
+        setDashboardError("");
+
+        try {
+            const data = await apiRequest("/canvases");
+
+            const loadedProjects = (data.canvases || []).map((canvas) => ({
+                id: canvas.id,
+                title: canvas.title || "Untitled Project",
+                owner: "You",
+                sources: canvas.source_count ?? 0,
+                lastOpened: formatDashboardDate(canvas.last_opened_at),
+                access: canvas.access_level === "shared" ? "Shared" : "Private",
+                pinned: Boolean(canvas.is_pinned),
+                updated: formatDashboardDate(canvas.updated_at || canvas.created_at),
+                theme: canvas.cover_type || "cards",
+            }));
+
+            setProjects(loadedProjects);
+        } catch (error) {
+            console.error("Load projects error:", error);
+            setDashboardError(error.message || "Failed to load projects.");
+        } finally {
+            setIsLoadingProjects(false);
+        }
+    };
+
+    const handleCreateProject = async () => {
+        try {
+            const data = await apiRequest("/canvases", {
+                method: "POST",
+                body: JSON.stringify({
+                    title: "Untitled Project",
+                }),
+            });
+
+            const canvasId = data.canvas?.id;
+
+            if (!canvasId) {
+                throw new Error("Canvas was created but no id was returned.");
+            }
+
+            navigate(`/workspace/${canvasId}`);
+        } catch (error) {
+            console.error("Create project error:", error);
+            alert(error.message || "Failed to create project.");
+        }
+    };
+
+    const handleOpenProject = async (project) => {
+        try {
+            await apiRequest(`/canvases/${project.id}/open`, {
+                method: "PATCH",
+            });
+        } catch (error) {
+            console.warn("Could not update last opened time:", error);
+        }
+
         navigate(`/workspace/${project.id}`);
     };
 
-        const handleLogout = () => {
-            localStorage.removeItem("nexo_token");
-            localStorage.removeItem("nexo_user");
-            navigate("/login");
-        };
+    const handleLogout = () => {
+        localStorage.removeItem("nexo_token");
+        localStorage.removeItem("nexo_user");
+        navigate("/login");
+    };
 
-        
+    useEffect(() => {
+        loadProjects();
+    }, []);
+
     return (
         <div className="Dashboard_Page">
         <header className="Dashboard_Header">
@@ -182,8 +205,29 @@ function Dashboard() {
                 </button>
                 </div>
             </div>
+            {dashboardError && (
+                <div className="Dashboard_Status_Message Dashboard_Error">
+                    {dashboardError}
+                </div>
+            )}
 
-            {viewMode === "grid" ? (
+            {isLoadingProjects && (
+                <div className="Dashboard_Status_Message">
+                    Loading your projects...
+                </div>
+            )}
+
+            {!isLoadingProjects && projects.length === 0 && (
+                <div className="Dashboard_Empty_State">
+                    <h3>No projects yet</h3>
+                    <p>Create a blank research space to start organizing sources, notes, and AI frameworks.</p>
+                    <button type="button" onClick={handleCreateProject}>
+                        Create your first project
+                    </button>
+                </div>
+            )}
+            {!isLoadingProjects && projects.length > 0 && (
+                viewMode === "grid" ? (
                 <div className="Dashboard_Project_Grid">
                 {projects.map((project) => (
                     <div
@@ -272,7 +316,7 @@ function Dashboard() {
                     </button>
                 ))}
                 </div>
-            )}
+            ))}
             </section>
         </main>
         </div>

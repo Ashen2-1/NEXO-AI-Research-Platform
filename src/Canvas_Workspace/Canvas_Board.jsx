@@ -1621,7 +1621,7 @@ function CanvasBoard(){
                     source_filters: uniqueSelectedSourceNames,
                     source_filter: uniqueSelectedSourceNames[0] || "",
                     chat_history: chatHistoryForApi,
-                    canvas_id: "default",
+                    canvas_id: currentCanvasId,
                 }),
             });
             console.log("AI RESPONSE DATA:", data);
@@ -3040,7 +3040,7 @@ function CanvasBoard(){
                 source_filters: cleanSourceFilters,
                 source_filter: sourceFilter || cleanSourceFilters[0] || "",
                 chat_history: [],
-                canvas_id: "default",
+                canvas_id: currentCanvasId,
             }),
         });
 
