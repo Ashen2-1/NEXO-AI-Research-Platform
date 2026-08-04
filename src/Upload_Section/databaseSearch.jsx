@@ -825,7 +825,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                         <span className="database-filter-empty">
                             {provider ===
                             "openalex"
-                                ? "Search online sources to load options."
+                                ? "Search external sources to load options."
                                 : "No options available."}
                         </span>
                     )}
@@ -857,7 +857,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                     <h4>
                         {isLocal
                             ? "LOCAL ARCHIVE"
-                            : "SEARCH ONLINE"}
+                            : "EXTERNAL SEARCH"}
                     </h4>
     
                     <button
@@ -971,7 +971,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                             )
                         }
                     >
-                        SEARCH ONLINE
+                        EXTERNAL SEARCH
                     </button>
                 </div>
 
@@ -992,7 +992,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                                 type="text"
                                 placeholder={
                                     activeTab === "external"
-                                        ? "Search SEARCH ONLINE papers..."
+                                        ? "Search external sources..."
                                         : "Search articles, books, images..."
                                 }
                                 value={searchTerm}
@@ -1099,10 +1099,10 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                                         : "s"
                                 } • ${
                                     activeTab === "external"
-                                        ? "SEARCH ONLINE"
+                                        ? "EXTERNAL SEARCH"
                                         : activeTab === "local"
                                             ? "Local Archive"
-                                            : "Local + SEARCH ONLINE"
+                                            : "Local + EXTERNAL SEARCH"
                                 }`}
                         </div>
 
@@ -1121,7 +1121,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                                         "external" &&
                                     submittedSearchTerm.length <
                                         2
-                                        ? "Enter at least 2 characters and press Enter to search SEARCH ONLINE."
+                                        ? "Enter at least 2 characters and press Enter to search external sources."
                                         : "No results found."}
                                 </div>
                             )}
