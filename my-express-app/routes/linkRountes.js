@@ -6,9 +6,30 @@ const router = express.Router();
 
 router.get("/", authMiddleware, async (req, res) => {
     try {
+        const canvasId = String(req.query.canvas_id || "default");
+
         const result = await pool.query(
-            `select id, from_note_id, to_note_id, created_at from public.note_links where user_id = $1 order by created_at asc`, [req.user.id]
+            `
+            select
+                l.id,
+                l.from_note_id,
+                l.to_note_id,
+                l.created_at
+            from public.note_links l
+            join public.notes n1
+                on n1.id = l.from_note_id
+            join public.notes n2
+                on n2.id = l.to_note_id
+            where l.user_id = $1
+              and n1.user_id = $1
+              and n2.user_id = $1
+              and n1.canvas_id = $2
+              and n2.canvas_id = $2
+            order by l.created_at asc
+            `,
+            [req.user.id, canvasId]
         );
+
         res.json({
             links: result.rows,
         });
@@ -30,6 +51,22 @@ router.post("/", authMiddleware, async (req, res) => {
     }
 
     try {
+        const noteCheck = await pool.query(
+            `
+            select count(*)::int as count
+            from public.notes
+            where user_id = $1
+              and id = any($2::uuid[])
+            `,
+            [req.user.id, [from_note_id, to_note_id]]
+        );
+
+        if (noteCheck.rows[0].count !== 2) {
+            return res.status(400).json({
+                error: "Both notes must belong to the current user.",
+            });
+        }
+
         const result = await pool.query(
             `insert into public.note_links (user_id, from_note_id, to_note_id)
              values ($1, $2, $3)

@@ -585,6 +585,7 @@ function CanvasBoard(){
     
         const getNoteCreatePayload = (note) => ({
             title: note.title,
+            canvas_id: currentCanvasId,
             body: note.body ?? "",
             user_note: note.userNote ?? "",
     
@@ -1313,10 +1314,7 @@ function CanvasBoard(){
             getSnapshot();
 
         const newNoteData = {
-            title:
-                doc.title ||
-                "Untitled Source",
-                
+            title: doc.title || "Untitled Source",
             canvas_id: currentCanvasId,
 
             body:
@@ -1325,41 +1323,23 @@ function CanvasBoard(){
 
             user_note: "",
 
-            x:
-                300 +
-                notes.length *
-                    30,
-
-            y:
-                120 +
-                notes.length *
-                    30,
+            x: 300 + notes.length * 30,
+            y: 120 + notes.length * 30,
 
             source_type:
                 isOpenAlex
                     ? "openalex"
-                    : doc.content_type ||
-                      "document",
+                    : doc.content_type || "document",
 
             source_name:
                 isOpenAlex
-                    ? doc.openalex_id ||
-                      doc.doi ||
-                      doc.id
-                    : doc.source ||
-                      doc.title,
+                    ? doc.openalex_id || doc.doi || doc.id
+                    : doc.source || doc.title,
 
-            file_url:
-                sourceUrl,
-
-            file_size:
-                null,
-
-            chunks_added:
-                null,
-
-            db_total:
-                null,
+            file_url: sourceUrl,
+            file_size: null,
+            chunks_added: null,
+            db_total: null,
         };
 
         try {
@@ -1788,6 +1768,7 @@ function CanvasBoard(){
 
         const newNoteData = {
             title: file.title,
+            canvas_id: currentCanvasId,
             body: "Note or AI summary from the source",
             user_note: "",
             x,
@@ -3099,7 +3080,9 @@ function CanvasBoard(){
     /***************************************************************************/
     const loadLinksFromDatabase = async () => {
         try {
-            const data = await apiRequest("/links");
+            const data = await apiRequest(
+                `/links?canvas_id=${encodeURIComponent(currentCanvasId)}`
+            );
 
             const databaseLinks = data.links.map(convertDatabaseLinkToCanvasLink);
 
@@ -3139,7 +3122,7 @@ function CanvasBoard(){
     /***************************************************************************/
     const createLinkInDatabase = async (fromNoteId, toNoteId) => {
         try {
-            const data = await apiRequest("/links", {
+            const data = await apiRequest(`/links?canvas_id=${encodeURIComponent(currentCanvasId)}`, {
                 method: "POST",
                 body: JSON.stringify({
                     from_note_id: fromNoteId,
@@ -3256,7 +3239,9 @@ function CanvasBoard(){
     /***************************************************************************/
     const loadNotesFromDatabase = async () => {
         try {
-            const data = await apiRequest("/notes");
+            const data = await apiRequest(
+                `/notes?canvas_id=${encodeURIComponent(currentCanvasId)}`
+            );
 
             const allDatabaseNotes = data.notes.map(convertDatabaseNoteToCanvasNote);
             const savedFrameworks = sortFrameworkVersions(
@@ -3594,6 +3579,7 @@ function CanvasBoard(){
                 method: "POST",
                 body: JSON.stringify({
                     title: frameworkTitle,
+                    canvas_id: currentCanvasId,
                     body: frameworkText,
 
                     // Framework metadata and source links
@@ -3786,6 +3772,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                 method: "POST",
                 body: JSON.stringify({
                     title: outlineTitle,
+                    canvas_id: currentCanvasId,
                     body: outlineText,
                     user_note: outlineHtml,
                     x: outlineX,
@@ -3898,6 +3885,19 @@ ${frameworkEditorDraft.slice(0, 60000)}
     ]);
     /***************************************************************************/
     useEffect(() => {
+        setNotes([]);
+        setFiles([]);
+        setLinks([]);
+        setChatMessages([]);
+        setOpenedNoteId(null);
+        setHoveredNoteId(null);
+        setActiveCitationSource(null);
+
+        setCurrentFramework(null);
+        setFrameworkVersions([]);
+        setFrameworkEditorDraft("");
+        setFrameworkStep("setup");
+
         loadNotesFromDatabase();
         loadLinksFromDatabase();
 
@@ -3905,20 +3905,14 @@ ${frameworkEditorDraft.slice(0, 60000)}
             frameworkGenerationAbortRef.current?.abort();
 
             if (zoomHistoryTimerRef.current) {
-                window.clearTimeout(
-                    zoomHistoryTimerRef.current
-                );
+                window.clearTimeout(zoomHistoryTimerRef.current);
             }
 
-            if (
-                previewCloseTimerRef.current !== null
-            ) {
-                window.clearTimeout(
-                    previewCloseTimerRef.current
-                );
+            if (previewCloseTimerRef.current !== null) {
+                window.clearTimeout(previewCloseTimerRef.current);
             }
         };
-    }, []);
+    }, [currentCanvasId]);
     /***************************************************************************/
     useEffect(() => {
         /*
@@ -4288,11 +4282,13 @@ ${frameworkEditorDraft.slice(0, 60000)}
     const handleCreateBlankNote = async () => {
         const newNoteData = {
             title: "New Note",
+            canvas_id: currentCanvasId,
             body: "Write your source text or idea here.",
             user_note: "",
             x: 320 + notes.length * 25,
             y: 140 + notes.length * 25,
             source_type: "note",
+            canvas_id: currentCanvasId,
         };
 
         const before = getSnapshot();

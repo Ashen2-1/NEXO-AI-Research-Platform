@@ -6,9 +6,11 @@ const router = express.Router();
 
 router.get("/", authMiddleware, async (req, res) => {
     try {
+        const canvasId = String(req.query.canvas_id || "default");
         const result = await pool.query(
             `select
                 id,
+                canvas_id,
                 title,
                 body,
                 user_note,
@@ -22,12 +24,14 @@ router.get("/", authMiddleware, async (req, res) => {
                 db_total,
                 is_locked,
                 is_pinned,
+                cluster_id,
                 created_at,
                 updated_at
              from public.notes
              where user_id = $1
+                and canvas_id = $2
              order by created_at asc`,
-            [req.user.id]
+            [req.user.id, canvasId]
         );
 
         res.json({
@@ -43,6 +47,7 @@ router.get("/", authMiddleware, async (req, res) => {
 });
 
 router.post("/", authMiddleware, async (req, res) => {
+    
     const {
         title,
         body,
@@ -65,11 +70,12 @@ router.post("/", authMiddleware, async (req, res) => {
             error: "Title is required.",
         });
     }
-
+    const canvasId = String(req.body.canvas_id || "default");
     try {
         const result = await pool.query(
             `insert into public.notes (
                 user_id,
+                canvas_id,
                 title,
                 body,
                 user_note,
@@ -88,10 +94,11 @@ router.post("/", authMiddleware, async (req, res) => {
              values (
                 $1, $2, $3, $4, $5,
                 $6, $7, $8, $9, $10,
-                $11, $12, $13, $14, $15
+                $11, $12, $13, $14, $15, $16
              )
              returning
                 id,
+                canvas_id,
                 title,
                 body,
                 user_note,
@@ -110,6 +117,7 @@ router.post("/", authMiddleware, async (req, res) => {
                 updated_at`,
             [
                 req.user.id,
+                canvasId,
                 title,
                 body ?? "",
                 user_note ?? "",
@@ -186,6 +194,7 @@ router.patch("/:id", authMiddleware, async (req, res) => {
              where id = $10 and user_id = $11
              returning
                 id,
+                canvas_id,
                 title,
                 body,
                 user_note,
