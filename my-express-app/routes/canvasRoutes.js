@@ -69,4 +69,32 @@ router.patch("/:id/open", authMiddleware, async (req, res) => {
   }
 });
 
+router.delete("/:id", authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      update canvases
+      set is_archived = true,
+          updated_at = now()
+      where id = $1
+        and user_id = $2
+      returning *
+      `,
+      [req.params.id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Canvas not found." });
+    }
+
+    res.json({
+      message: "Canvas archived successfully.",
+      canvas: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Delete canvas error:", error);
+    res.status(500).json({ error: "Failed to delete canvas." });
+  }
+});
+
 export default router;

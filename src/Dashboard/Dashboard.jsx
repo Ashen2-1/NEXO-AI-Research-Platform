@@ -66,12 +66,39 @@ function Dashboard() {
         }
     };
 
-    const handleCreateProject = async () => {
+    const handleDeleteProject = async (project) => {
+        const confirmed = window.confirm(
+            `Delete "${project.title}"?\n\nThis will archive the project from your dashboard.`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            await apiRequest(`/canvases/${project.id}`, {
+                method: "DELETE",
+            });
+
+            setProjects((previousProjects) =>
+                previousProjects.filter((item) => item.id !== project.id)
+            );
+        } catch (error) {
+            console.error("Delete project error:", error);
+            alert(error.message || "Failed to delete project.");
+        }
+    };
+
+    const handleCreateProject = async (mode = "blank") => {
         try {
             const data = await apiRequest("/canvases", {
                 method: "POST",
                 body: JSON.stringify({
-                    title: "Untitled Project",
+                    title:
+                        mode === "import"
+                            ? "Imported Sources Project"
+                            : "Untitled Project",
+                    start_mode: mode,
                 }),
             });
 
@@ -81,7 +108,7 @@ function Dashboard() {
                 throw new Error("Canvas was created but no id was returned.");
             }
 
-            navigate(`/workspace/${canvasId}`);
+            navigate(`/workspace/${canvasId}${mode === "import" ? "?upload=true" : ""}`);
         } catch (error) {
             console.error("Create project error:", error);
             alert(error.message || "Failed to create project.");
@@ -143,7 +170,7 @@ function Dashboard() {
                 <button
                 type="button"
                 className="Dashboard_Start_Card"
-                onClick={handleCreateProject}
+                onClick={() => handleCreateProject("blank")}
                 >
                 <div className="Dashboard_Start_Icon">＋</div>
 
@@ -156,7 +183,7 @@ function Dashboard() {
                 <button
                 type="button"
                 className="Dashboard_Start_Card"
-                onClick={handleCreateProject}
+                onClick={() => handleCreateProject("import")}
                 >
                 <div className="Dashboard_Start_Icon">⇧</div>
 
@@ -267,7 +294,7 @@ function Dashboard() {
                         <button type="button" className="Dashboard_Project_Menu" 
                             onClick={(event) => {
                                 event.stopPropagation();
-                                alert("Project menu coming soon.");
+                                handleDeleteProject(project);
                             }}
                         >
                             •••

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Header from "./Header.jsx";
 import UploadFile from "../Upload_Section/uploadFile.jsx";
 import DatabaseSearch from "../Upload_Section/databaseSearch.jsx";
@@ -189,6 +189,7 @@ const getCanvasNoteTypeLabel = (
 function CanvasBoard(){
     const navigate = useNavigate();
     const { canvasId } = useParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const currentCanvasId = canvasId || "default";
 
     const currentUser = JSON.parse(localStorage.getItem("nexo_user") || "null");
@@ -3832,6 +3833,13 @@ ${frameworkEditorDraft.slice(0, 60000)}
     };
     /***************************************************************************/
     useEffect(() => {
+        if (searchParams.get("upload") === "true") {
+            setShowUploadModal(true);
+            setSearchParams({}, { replace: true });
+        }
+    }, [searchParams, setSearchParams]);
+    useEffect(() => {
+
         if (!isFeedbackOpen) {
             return;
         }
