@@ -6,6 +6,10 @@ import "./Dashboard.css";
 function Dashboard() {
     const navigate = useNavigate();
     const [viewMode, setViewMode] = useState("grid");
+    const [openProjectMenuId, setOpenProjectMenuId] = useState(null);
+    const [projectToDelete, setProjectToDelete] = useState(null);
+    const [projectToRename, setProjectToRename] = useState(null);
+    const [renameDraft, setRenameDraft] = useState("");
 
     const [projects, setProjects] = useState([]);
     const [isLoadingProjects, setIsLoadingProjects] = useState(true);
@@ -66,26 +70,66 @@ function Dashboard() {
         }
     };
 
-    const handleDeleteProject = async (project) => {
-        const confirmed = window.confirm(
-            `Delete "${project.title}"?\n\nThis will archive the project from your dashboard.`
-        );
-
-        if (!confirmed) {
+    const handleDeleteProject = async () => {
+        if (!projectToDelete) {
             return;
         }
 
         try {
-            await apiRequest(`/canvases/${project.id}`, {
+            await apiRequest(`/canvases/${projectToDelete.id}`, {
                 method: "DELETE",
             });
 
             setProjects((previousProjects) =>
-                previousProjects.filter((item) => item.id !== project.id)
+                previousProjects.filter((item) => item.id !== projectToDelete.id)
             );
+
+            setProjectToDelete(null);
         } catch (error) {
             console.error("Delete project error:", error);
             alert(error.message || "Failed to delete project.");
+        }
+    };
+
+    const handleRenameProject = async () => {
+        if (!projectToRename) {
+            return;
+        }
+
+        const nextTitle = renameDraft.trim();
+
+        if (!nextTitle) {
+            alert("Project name cannot be empty.");
+            return;
+        }
+
+        try {
+            const data = await apiRequest(`/canvases/${projectToRename.id}`, {
+                method: "PATCH",
+                body: JSON.stringify({
+                    title: nextTitle,
+                }),
+            });
+
+            const updatedCanvas = data.canvas;
+
+            setProjects((previousProjects) =>
+                previousProjects.map((project) =>
+                    project.id === projectToRename.id
+                        ? {
+                            ...project,
+                            title: updatedCanvas?.title || nextTitle,
+                            updated: "Today",
+                        }
+                        : project
+                )
+            );
+
+            setProjectToRename(null);
+            setRenameDraft("");
+        } catch (error) {
+            console.error("Rename project error:", error);
+            alert(error.message || "Failed to rename project.");
         }
     };
 
@@ -168,9 +212,9 @@ function Dashboard() {
 
             <div className="Dashboard_Start_Grid">
                 <button
-                type="button"
-                className="Dashboard_Start_Card"
-                onClick={() => handleCreateProject("blank")}
+                    type="button"
+                    className="Dashboard_Start_Card"
+                    onClick={() => handleCreateProject("blank")}
                 >
                 <div className="Dashboard_Start_Icon">＋</div>
 
@@ -181,15 +225,16 @@ function Dashboard() {
                 </button>
 
                 <button
-                type="button"
-                className="Dashboard_Start_Card"
-                onClick={() => handleCreateProject("import")}
+                    type="button"
+                    className="Dashboard_Start_Card Disabled"
+                    disabled
+                    title="Coming soon"
                 >
                 <div className="Dashboard_Start_Icon">⇧</div>
 
                 <div className="Dashboard_Start_Bottom">
-                    <strong>Import existing sources</strong>
-                    <span>→</span>
+                    <strong>Import existing workspace</strong>
+                    <span>Soon</span>
                 </div>
                 </button>
             </div>
@@ -291,14 +336,49 @@ function Dashboard() {
                         </div>
                         </div>
 
-                        <button type="button" className="Dashboard_Project_Menu" 
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                handleDeleteProject(project);
-                            }}
-                        >
-                            •••
-                        </button>
+                        <div className="Dashboard_Project_Menu_Wrap">
+                            <button
+                                type="button"
+                                className="Dashboard_Project_Menu"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    setOpenProjectMenuId((currentId) =>
+                                        currentId === project.id ? null : project.id
+                                    );
+                                }}
+                            >
+                                •••
+                            </button>
+
+                            {openProjectMenuId === project.id && (
+                                <div
+                                    className="Dashboard_Project_Menu_Dropdown"
+                                    onClick={(event) => event.stopPropagation()}
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setProjectToRename(project);
+                                            setRenameDraft(project.title);
+                                            setOpenProjectMenuId(null);
+                                        }}
+                                    >
+                                        Rename
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className="Danger"
+                                        onClick={() => {
+                                            setProjectToDelete(project);
+                                            setOpenProjectMenuId(null);
+                                        }}
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                     </div>
                 ))}
@@ -347,6 +427,69 @@ function Dashboard() {
             ))}
             </section>
         </main>
+        {projectToDelete && (
+            <div className="Dashboard_Modal_Overlay">
+                <div className="Dashboard_Modal">
+                    <h3>Delete project?</h3>
+                    <p>
+                        This will archive "{projectToDelete.title}" from your dashboard.
+                        You can restore it later after we add Archive management.
+                    </p>
+
+                    <div className="Dashboard_Modal_Actions">
+                        <button
+                            type="button"
+                            onClick={() => setProjectToDelete(null)}
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            type="button"
+                            className="Danger"
+                            onClick={handleDeleteProject}
+                        >
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {projectToRename && (
+            <div className="Dashboard_Modal_Overlay">
+                <div className="Dashboard_Modal">
+                    <h3>Rename project</h3>
+
+                    <input
+                        className="Dashboard_Rename_Input"
+                        value={renameDraft}
+                        onChange={(event) => setRenameDraft(event.target.value)}
+                        autoFocus
+                    />
+
+                    <div className="Dashboard_Modal_Actions">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setProjectToRename(null);
+                                setRenameDraft("");
+                            }}
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            type="button"
+                            className="Primary"
+                            onClick={handleRenameProject}
+                        >
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
         </div>
     );
 }

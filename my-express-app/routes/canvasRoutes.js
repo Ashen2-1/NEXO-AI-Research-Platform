@@ -69,6 +69,37 @@ router.patch("/:id/open", authMiddleware, async (req, res) => {
   }
 });
 
+router.patch("/:id", authMiddleware, async (req, res) => {
+  try {
+    const title = String(req.body.title || "").trim();
+
+    if (!title) {
+      return res.status(400).json({ error: "Title is required." });
+    }
+
+    const result = await pool.query(
+      `
+      update canvases
+      set title = $1,
+          updated_at = now()
+      where id = $2
+        and user_id = $3
+      returning *
+      `,
+      [title, req.params.id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Canvas not found." });
+    }
+
+    res.json({ canvas: result.rows[0] });
+  } catch (error) {
+    console.error("Rename canvas error:", error);
+    res.status(500).json({ error: "Failed to rename canvas." });
+  }
+});
+
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
