@@ -356,11 +356,21 @@ router.post("/ingest", authMiddleware, (req, res) => { upload.single("file")(req
                                 }
                             );
 
-                        ingestData =
-                            response.data ||
-                            {};
+                        ingestData = response.data || {};
 
-                        ingested = true;
+                        const chunksAdded = Number(
+                            ingestData.chunks_added ??
+                            ingestData.chunksAdded ??
+                            0
+                        );
+
+                        ingested = chunksAdded > 0;
+
+                        if (!ingested) {
+                            warning =
+                                `The ${sourceType} file was uploaded, but no readable chunks were indexed. ` +
+                                "Please check whether the PDF text can be extracted.";
+                        }
                     } catch (error) {
                         const serviceError =
                             getFastApiErrorMessage(

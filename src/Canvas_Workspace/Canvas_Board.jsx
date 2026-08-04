@@ -5436,7 +5436,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                     )}
                 </aside>
             </main>
-            <UploadFile showModal={showUploadModal} onClose={() => setShowUploadModal(false)} onUploadSuccess={handleUploadSuccess}/>
+            <UploadFile showModal={showUploadModal} onClose={() => setShowUploadModal(false)} onUploadSuccess={handleUploadSuccess} canvasId={currentCanvasId}/>
             <DatabaseSearch showModal={showDatabaseSearch} onClose={() => setShowDatabaseSearch(false)} onSendToBoard={handleSendDocToBoard}/>
             
             {isFeedbackOpen && (

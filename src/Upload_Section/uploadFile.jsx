@@ -3,7 +3,7 @@ import { buildApiUrl } from "../api.js";
 import "./uploadFile.css";
 
 
-function UploadFile({ showModal, onClose, onUploadSuccess}) {
+function UploadFile({ showModal, onClose, onUploadSuccess, canvasId = "default",}) {
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState(0);
   const [closing, setClosing] = useState(false);
@@ -158,6 +158,7 @@ const getFileExtension = (
     return new Promise((resolve, reject) => {
       const formData = new FormData();
       formData.append("file", fileToUpload);
+      formData.append("canvas_id", canvasId || "default");
 
       const xhr = new XMLHttpRequest();
 
