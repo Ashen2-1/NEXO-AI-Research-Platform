@@ -47,6 +47,7 @@ function Header({
     onSave,
     onExport,
     onShare,
+    onViewUserGuide,
     onFeedback,
     onSettings,
     onLogoClick,
@@ -138,6 +139,7 @@ function Header({
                                         type="button"
                                         className="Header_Help_Menu_Item"
                                         role="menuitem"
+                                        onClick={onViewUserGuide}
                                     >
                                         <span>View User Guide</span>
 
