@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./HowToUsePage.css";
 
-const WORKSPACE_ROUTE = "/";
+const WORKSPACE_ROUTE = "/dashboard";
 
 const GUIDE_MEDIA = {
     build:

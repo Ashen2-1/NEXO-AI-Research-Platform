@@ -106,6 +106,7 @@ app.use("/api/files", fileRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/links", linkRoutes);
 app.use("/api/canvases", canvasRoutes);
+app.use("/api/documents", documentRoutes);
 
 
 app.use((req, res) => {

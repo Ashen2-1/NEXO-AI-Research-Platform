@@ -971,7 +971,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                             )
                         }
                     >
-                        OPENALEX
+                        SEARCH ONLINE
                     </button>
                 </div>
 
@@ -992,7 +992,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                                 type="text"
                                 placeholder={
                                     activeTab === "external"
-                                        ? "Search OpenAlex papers..."
+                                        ? "Search SEARCH ONLINE papers..."
                                         : "Search articles, books, images..."
                                 }
                                 value={searchTerm}
@@ -1099,10 +1099,10 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                                         : "s"
                                 } • ${
                                     activeTab === "external"
-                                        ? "OpenAlex"
+                                        ? "SEARCH ONLINE"
                                         : activeTab === "local"
                                             ? "Local Archive"
-                                            : "Local + OpenAlex"
+                                            : "Local + SEARCH ONLINE"
                                 }`}
                         </div>
 
@@ -1121,7 +1121,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                                         "external" &&
                                     submittedSearchTerm.length <
                                         2
-                                        ? "Enter at least 2 characters and press Enter to search OpenAlex."
+                                        ? "Enter at least 2 characters and press Enter to search SEARCH ONLINE."
                                         : "No results found."}
                                 </div>
                             )}
