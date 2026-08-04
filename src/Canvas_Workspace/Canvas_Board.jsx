@@ -4999,9 +4999,13 @@ ${frameworkEditorDraft.slice(0, 60000)}
                 onExport={handleExportProject}
                 onShare={handleShareProject}
 
-                onViewUserGuide={() =>
-                    navigate("/how-to-use")
-                }
+                onViewUserGuide={() => {
+                    navigate("/help", {
+                        state: {
+                            backTo: `/workspace/${currentCanvasId}`,
+                        },
+                    });
+                }}
 
                 onFeedback={handleOpenFeedback}
                 onSettings={handleOpenSettings}

@@ -1,8 +1,8 @@
 import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./HowToUsePage.css";
 
-const WORKSPACE_ROUTE = "/dashboard";
+
 
 const GUIDE_MEDIA = {
     build:
@@ -112,6 +112,9 @@ function GuideVideo({
 
 function HowToUsePage() {
     const navigate = useNavigate();
+    const location = useLocation();
+
+    const backTo = location.state?.backTo || "/dashboard";
 
     useEffect(() => {
         const previousTitle = document.title;
@@ -123,7 +126,7 @@ function HowToUsePage() {
     }, []);
 
     const goToWorkspace = () => {
-        navigate(WORKSPACE_ROUTE);
+        navigate(backTo);
     };
 
     const scrollToWorkflow = () => {
