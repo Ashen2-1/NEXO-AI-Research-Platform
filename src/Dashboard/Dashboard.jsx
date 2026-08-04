@@ -11,6 +11,9 @@ function Dashboard() {
     const [projectToRename, setProjectToRename] = useState(null);
     const [renameDraft, setRenameDraft] = useState("");
 
+    const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+    const [createProjectDraft, setCreateProjectDraft] = useState("");
+
     const [projects, setProjects] = useState([]);
     const [isLoadingProjects, setIsLoadingProjects] = useState(true);
     const [dashboardError, setDashboardError] = useState("");
@@ -133,16 +136,19 @@ function Dashboard() {
         }
     };
 
-    const handleCreateProject = async (mode = "blank") => {
+    const handleCreateProject = async () => {
+        const title = createProjectDraft.trim();
+
+        if (!title) {
+            alert("Please enter a project name.");
+            return;
+        }
+
         try {
             const data = await apiRequest("/canvases", {
                 method: "POST",
                 body: JSON.stringify({
-                    title:
-                        mode === "import"
-                            ? "Imported Sources Project"
-                            : "Untitled Project",
-                    start_mode: mode,
+                    title,
                 }),
             });
 
@@ -152,7 +158,10 @@ function Dashboard() {
                 throw new Error("Canvas was created but no id was returned.");
             }
 
-            navigate(`/workspace/${canvasId}${mode === "import" ? "?upload=true" : ""}`);
+            setIsCreateProjectOpen(false);
+            setCreateProjectDraft("");
+
+            navigate(`/workspace/${canvasId}`);
         } catch (error) {
             console.error("Create project error:", error);
             alert(error.message || "Failed to create project.");
@@ -214,7 +223,7 @@ function Dashboard() {
                 <button
                     type="button"
                     className="Dashboard_Start_Card"
-                    onClick={() => handleCreateProject("blank")}
+                    onClick={() => {setCreateProjectDraft(""); setIsCreateProjectOpen(true);}}
                 >
                 <div className="Dashboard_Start_Icon">＋</div>
 
@@ -307,7 +316,9 @@ function Dashboard() {
                         key={project.id}
                         role="button"
                         tabIndex={0}
-                        className="Dashboard_Project_Card"
+                        className={`Dashboard_Project_Card ${
+                            openProjectMenuId === project.id ? "Menu_Open" : ""
+                        }`}
                         onClick={() => handleOpenProject(project)}
                         onKeyDown={(event) => {
                             if (event.key === "Enter") {
@@ -427,6 +438,8 @@ function Dashboard() {
             ))}
             </section>
         </main>
+        
+
         {projectToDelete && (
             <div className="Dashboard_Modal_Overlay">
                 <div className="Dashboard_Modal">
@@ -490,6 +503,48 @@ function Dashboard() {
                 </div>
             </div>
         )}
+
+        {isCreateProjectOpen && (
+            <div className="Dashboard_Modal_Overlay">
+                <div className="Dashboard_Modal">
+                    <h3>Create new project</h3>
+                    <p>Name your research workspace. You can rename it later.</p>
+
+                    <input
+                        className="Dashboard_Rename_Input"
+                        value={createProjectDraft}
+                        onChange={(event) => setCreateProjectDraft(event.target.value)}
+                        placeholder="Example: Quantum Mechanics Notes"
+                        autoFocus
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                                handleCreateProject();
+                            }
+                        }}
+                    />
+
+                    <div className="Dashboard_Modal_Actions">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsCreateProjectOpen(false);
+                                setCreateProjectDraft("");
+                            }}
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            type="button"
+                            className="Primary"
+                            onClick={handleCreateProject}
+                        >
+                            Create
+                        </button>
+                    </div>
+                </div>
+            </div>
+)}
         </div>
     );
 }

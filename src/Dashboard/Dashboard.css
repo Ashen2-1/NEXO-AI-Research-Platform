@@ -725,3 +725,32 @@
     border-color: #111;
     outline: none;
 }
+
+
+.Dashboard_Project_Card {
+    position: relative;
+    overflow: visible;
+    z-index: 1;
+}
+
+.Dashboard_Project_Card:hover {
+    z-index: 20;
+}
+
+.Dashboard_Project_Card.Menu_Open {
+    z-index: 1000;
+}
+
+.Dashboard_Project_Menu_Wrap {
+    position: relative;
+    z-index: 1001;
+}
+
+.Dashboard_Project_Menu_Dropdown {
+    z-index: 1002;
+}
+
+.Dashboard_Project_Grid,
+.Dashboard_Projects {
+    overflow: visible;
+}
