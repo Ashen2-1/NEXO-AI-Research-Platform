@@ -5,14 +5,10 @@ import "./HowToUsePage.css";
 
 
 const GUIDE_MEDIA = {
-    build:
-        "/public/assets/build-research-space.mp4",
-    connect:
-        "/public/assets/make-connections.mp4",
-    discover:
-        "/public/assets/discover-new-sources.mp4",
-    conversation:
-        "/public/assets/start-a-conversation.mp4",
+    build: "/assets/build-research-space.mp4",
+    connect: "/assets/make-connections.mp4",
+    discover: "/assets/discover-new-sources.mp4",
+    conversation: "/assets/start-a-conversation.mp4",
 };
 
 const WORKFLOW_STEPS = [
