@@ -5,7 +5,8 @@ import "./HowToUsePage.css";
 
 
 const GUIDE_MEDIA = {
-    build: "/assets/build-research-space.mp4",
+    intro: "/assets/heropg.mp4",
+    build: "/assets/upload.mp4",
     connect: "/assets/make-connections.mp4",
     discover: "/assets/discover-new-sources.mp4",
     conversation: "/assets/start-a-conversation.mp4",
@@ -192,7 +193,7 @@ function HowToUsePage() {
                           as the looping hero preview and again in Step 01.
                         */}
                         <GuideVideo
-                            src={GUIDE_MEDIA.build}
+                            src={GUIDE_MEDIA.intro}
                             label="NEXO workspace overview"
                             className="Guide_Hero_Media"
                         />
