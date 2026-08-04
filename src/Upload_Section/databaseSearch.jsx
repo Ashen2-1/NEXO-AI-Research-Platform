@@ -857,7 +857,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                     <h4>
                         {isLocal
                             ? "LOCAL ARCHIVE"
-                            : "OPENALEX"}
+                            : "SEARCH ONLINE"}
                     </h4>
     
                     <button
