@@ -4998,6 +4998,11 @@ ${frameworkEditorDraft.slice(0, 60000)}
                 onSave={handleSaveProject}
                 onExport={handleExportProject}
                 onShare={handleShareProject}
+
+                onViewUserGuide={() =>
+                    navigate("/how-to-use")
+                }
+
                 onFeedback={handleOpenFeedback}
                 onSettings={handleOpenSettings}
             />
