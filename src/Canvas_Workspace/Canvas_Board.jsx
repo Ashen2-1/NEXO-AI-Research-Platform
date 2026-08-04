@@ -1134,6 +1134,7 @@ function CanvasBoard(){
 
         const newNoteData = {
             title: uploadedFile.name,
+            canvas_id: currentCanvasId,
             body: noteBody,
             user_note: "",
             x: 260 + notes.length * 35,
@@ -1315,6 +1316,8 @@ function CanvasBoard(){
             title:
                 doc.title ||
                 "Untitled Source",
+                
+            canvas_id: currentCanvasId,
 
             body:
                 doc.description ||
