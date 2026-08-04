@@ -825,7 +825,7 @@ function DatabaseSearch({ showModal, onClose, onSendToBoard }) {
                         <span className="database-filter-empty">
                             {provider ===
                             "openalex"
-                                ? "Search OpenAlex to load options."
+                                ? "Search online sources to load options."
                                 : "No options available."}
                         </span>
                     )}
