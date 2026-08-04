@@ -13,6 +13,7 @@ import linkRoutes from "./routes/linkRountes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
 import canvasRoutes from "./routes/canvasRoutes.js";
+import feedbackRoutes from "./routes/feedbackRoutes.js";
 
 dotenv.config();
 
@@ -107,6 +108,7 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/links", linkRoutes);
 app.use("/api/canvases", canvasRoutes);
 app.use("/api/documents", documentRoutes);
+app.use("/api/feedback", feedbackRoutes);
 
 
 app.use((req, res) => {
