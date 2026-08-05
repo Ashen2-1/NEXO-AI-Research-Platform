@@ -1524,6 +1524,54 @@ function CanvasBoard(){
 
         const question = chatInput;
 
+        const selectedSourceNotes = notes.filter(
+            (note) =>
+                note.selected &&
+                note.sourceName &&
+                note.sourceType !== "openalex"
+        );
+
+        const hasIndexingSource = selectedSourceNotes.some(
+            (note) =>
+                note.ingestStatus === "indexing" ||
+                note.ingest_status === "indexing" ||
+                note.isTemporary
+        );
+
+        const hasFailedSource = selectedSourceNotes.some(
+            (note) =>
+                note.ingestStatus === "failed" ||
+                note.ingest_status === "failed"
+        );
+
+        if (hasIndexingSource) {
+            setChatMessages((prevMessages) => [
+                ...prevMessages,
+                {
+                    id: Date.now(),
+                    role: "ai",
+                    text: "This source is still indexing. Please wait until it shows INDEXED, then ask again.",
+                    sources: [],
+                },
+            ]);
+
+            return;
+        }
+
+        if (hasFailedSource) {
+            setChatMessages((prevMessages) => [
+                ...prevMessages,
+                {
+                    id: Date.now(),
+                    role: "ai",
+                    text: "This source was uploaded, but indexing failed. Please re-upload it or check the RAG server logs.",
+                    sources: [],
+                },
+            ]);
+
+            return;
+        }
+
         const userMessage = {
             id: Date.now(),
             role: "user",
