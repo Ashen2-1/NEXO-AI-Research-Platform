@@ -366,7 +366,7 @@ router.post("/ingest", authMiddleware, (req, res) => { upload.single("file")(req
 
                                     maxContentLength:
                                         Infinity,
-                                    timeout: 180000,
+                                    timeout: 600000,
                                 }
                             );
 
