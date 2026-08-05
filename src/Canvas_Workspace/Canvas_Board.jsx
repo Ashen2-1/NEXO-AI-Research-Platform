@@ -4876,14 +4876,48 @@ ${frameworkEditorDraft.slice(0, 60000)}
         setFeedbackDraft("");
     };
     
-    const handleSubmitFeedback = (event) => {
+    const handleSubmitFeedback = async (
+        event
+    ) => {
         event.preventDefault();
     
-        /*
-         * Layout-only placeholder.
-         * No backend request is made yet.
-         */
-        handleCloseFeedback();
+        const feedbackContent =
+            feedbackDraft.trim();
+    
+        if (!feedbackContent) {
+            return;
+        }
+    
+        try {
+            await apiRequest(
+                "/feedback",
+                {
+                    method: "POST",
+    
+                    body: JSON.stringify({
+                        feedback_content:
+                            feedbackContent,
+                    }),
+                }
+            );
+    
+            setFeedbackDraft("");
+            setIsFeedbackOpen(false);
+    
+            alert(
+                "Thank you! Your feedback has been saved."
+            );
+        } catch (error) {
+            console.error(
+                "Submit feedback error:",
+                error
+            );
+    
+            alert(
+                error?.message ||
+                    "Failed to save feedback. Please try again."
+            );
+        }
     };
 
     const handleSelectAll = () => {
@@ -5495,6 +5529,8 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                 )
                             }
                             placeholder="What’s working? What feels confusing? Tell us what you’d improve..."
+                            maxLength={5000}
+                            required
                             autoFocus
                         />
 
@@ -5515,6 +5551,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
                             <button
                                 type="submit"
                                 className="Feedback_Send_Button"
+                                disabled={!feedbackDraft.trim()}
                             >
                                 Send Feedback
                             </button>
