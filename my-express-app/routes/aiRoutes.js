@@ -152,6 +152,7 @@ router.post(
             use_rag = false,
             chat_history = [],
             canvas_id = "default",
+            inline_context = "",
         } = req.body;
 
         if (
@@ -220,6 +221,11 @@ router.post(
         formData.append(
             "chat_history",
             JSON.stringify(safeChatHistory)
+        );
+
+        formData.append(
+            "inline_context",
+            String(inline_context || "").slice(0, 25000)
         );
 
         let endpoint = "/query/general";

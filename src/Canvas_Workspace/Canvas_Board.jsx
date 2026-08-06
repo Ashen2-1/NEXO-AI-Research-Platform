@@ -1614,6 +1614,42 @@ function CanvasBoard(){
 
             const uniqueSelectedSourceNames = [...new Set(selectedSourceNames)];
 
+            const selectedInlineContexts = selectedNotes
+                .filter((note) => {
+                    const sourceType = String(note.source_type || "").toLowerCase();
+
+                    return (
+                        sourceType.includes("openalex") ||
+                        sourceType.includes("web") ||
+                        sourceType.includes("external") ||
+                        sourceType.includes("online")
+                    );
+                })
+                .map((note, index) => {
+                    const title =
+                        note.title ||
+                        note.source_name ||
+                        `External Source ${index + 1}`;
+
+                    const sourceName = note.source_name || "";
+                    const body = note.body || "";
+                    const userNote = note.user_note || "";
+                    const url = note.file_url || note.url || "";
+
+                    return [
+                        `[External Source ${index + 1}]`,
+                        `Title: ${title}`,
+                        sourceName ? `Source: ${sourceName}` : "",
+                        url ? `URL: ${url}` : "",
+                        body ? `Text: ${body}` : "",
+                        userNote ? `User note: ${userNote}` : "",
+                    ]
+                        .filter(Boolean)
+                        .join("\n");
+                })
+                .filter(Boolean)
+                .join("\n\n---\n\n");
+
             const shouldUseRag = uniqueSelectedSourceNames.length > 0;
 
             const selectedSourcesText =
@@ -1654,6 +1690,7 @@ function CanvasBoard(){
                     source_filter: uniqueSelectedSourceNames[0] || "",
                     chat_history: chatHistoryForApi,
                     canvas_id: currentCanvasId,
+                    inline_context: selectedInlineContexts,
                 }),
             });
             console.log("AI RESPONSE DATA:", data);
