@@ -1600,23 +1600,33 @@ function CanvasBoard(){
             //     chat_history: chatHistoryForApi,
             // });
 
-            const selectedSourceNames = notes
-                .filter(
-                    (note) =>
-                        note.selected &&
-                        note.sourceName &&
-                        note.sourceType !== "openalex" &&
-                        note.ingestStatus !== "indexing" &&
-                        note.ingestStatus !== "failed" &&
-                        !note.isTemporary
+            const selectedNotesForChat = notes.filter((note) => note.selected);
+
+            const selectedPdfSourceNames = selectedNotesForChat
+                .filter((note) => {
+                    const sourceType = String(note.sourceType || "").toLowerCase();
+
+                    return (
+                        sourceType === "pdf" ||
+                        sourceType === "word" ||
+                        sourceType === "excel" ||
+                        sourceType === "powerpoint" ||
+                        sourceType === "document"
+                    );
+                })
+                .filter((note) =>
+                    note.sourceName &&
+                    note.ingestStatus !== "indexing" &&
+                    note.ingestStatus !== "failed" &&
+                    !note.isTemporary
                 )
                 .map((note) => note.sourceName);
 
-            const uniqueSelectedSourceNames = [...new Set(selectedSourceNames)];
+            const uniqueSelectedSourceNames = [...new Set(selectedPdfSourceNames)];
 
-            const selectedInlineContexts = selectedNotes
+            const selectedInlineContexts = selectedNotesForChat
                 .filter((note) => {
-                    const sourceType = String(note.source_type || "").toLowerCase();
+                    const sourceType = String(note.sourceType || "").toLowerCase();
 
                     return (
                         sourceType.includes("openalex") ||
@@ -1628,13 +1638,13 @@ function CanvasBoard(){
                 .map((note, index) => {
                     const title =
                         note.title ||
-                        note.source_name ||
+                        note.sourceName ||
                         `External Source ${index + 1}`;
 
-                    const sourceName = note.source_name || "";
+                    const sourceName = note.sourceName || "";
                     const body = note.body || "";
-                    const userNote = note.user_note || "";
-                    const url = note.file_url || note.url || "";
+                    const userNote = note.userNote || "";
+                    const url = note.fileUrl || "";
 
                     return [
                         `[External Source ${index + 1}]`,
@@ -1650,17 +1660,36 @@ function CanvasBoard(){
                 .filter(Boolean)
                 .join("\n\n---\n\n");
 
-            const shouldUseRag = uniqueSelectedSourceNames.length > 0;
+            const hasSelectedPdfSources = uniqueSelectedSourceNames.length > 0;
+            const hasSelectedInlineContext = selectedInlineContexts.trim().length > 0;
+
+            const shouldUseRag =
+                hasSelectedPdfSources ||
+                hasSelectedInlineContext;
 
             const selectedSourcesText =
                 uniqueSelectedSourceNames.length > 0
                     ? uniqueSelectedSourceNames
                         .map((name, index) => `${index + 1}. ${name}`)
                         .join("\n")
-                    : "No selected sources.";
+                    : "";
+
+            const inlineSourcesText =
+                hasSelectedInlineContext
+                    ? `\n\nThe user has selected these external/web sources:\n${selectedInlineContexts}`
+                    : "";
 
             const enhancedQuestion = shouldUseRag
-                ? `The user has selected these source files:\n${selectedSourcesText}\n\nAnswer using only these selected sources.\n\nUser question: ${question}`
+                ? [
+                    selectedSourcesText
+                        ? `The user has selected these source files:\n${selectedSourcesText}`
+                        : "",
+                    inlineSourcesText,
+                    "Answer using only these selected sources.",
+                    `User question: ${question}`,
+                ]
+                    .filter(Boolean)
+                    .join("\n\n")
                 : question;
 
             console.log("CHAT RAG DEBUG:", {
@@ -1677,6 +1706,21 @@ function CanvasBoard(){
             timeoutId = window.setTimeout(() => {
                 abortController.abort();
             }, 90000);
+
+            console.log("CHAT SEND DEBUG:", {
+                currentCanvasId,
+                selectedNotes: selectedNotesForChat.map((note) => ({
+                    id: note.id,
+                    title: note.title,
+                    sourceType: note.sourceType,
+                    sourceName: note.sourceName,
+                    fileUrl: note.fileUrl,
+                    bodyPreview: String(note.body || "").slice(0, 160),
+                })),
+                uniqueSelectedSourceNames,
+                selectedInlineContextsLength: selectedInlineContexts.length,
+                shouldUseRag,
+            });
 
             const data = await apiRequest("/ai/query-text", {
                 

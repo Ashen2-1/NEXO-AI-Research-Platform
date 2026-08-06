@@ -180,9 +180,14 @@ router.post(
                 .slice(0, 200) ||
             "default";
 
+        const safeInlineContext = String(inline_context || "")
+            .trim()
+            .slice(0, 25000);
+
         const shouldUseRag =
             use_rag === true ||
-            use_rag === "true";
+            use_rag === "true" ||
+            safeInlineContext.length > 0;
 
         const safeTopK = Math.max(
             1,
@@ -225,7 +230,7 @@ router.post(
 
         formData.append(
             "inline_context",
-            String(inline_context || "").slice(0, 25000)
+            safeInlineContext
         );
 
         let endpoint = "/query/general";
@@ -268,6 +273,7 @@ router.post(
             shouldUseRag,
             endpoint,
             selectedSources,
+            inlineContextLength: safeInlineContext.length,
             historyCount: safeChatHistory.length,
             targetUrl,
         });
