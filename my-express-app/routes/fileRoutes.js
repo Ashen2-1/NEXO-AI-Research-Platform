@@ -93,6 +93,132 @@ const getFastApiErrorMessage = (error) => {
   return rawMessage.replace(/\s+/g, " ").slice(0, 500);
 };
 
+const sleep = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
+const warmUpFastApi = async (fastApiBaseUrl) => {
+    try {
+        await axios.get(`${fastApiBaseUrl}/health`, {
+            timeout: 30000,
+        });
+
+        return true;
+    } catch (error) {
+        console.warn(
+            "FastAPI warmup failed:",
+            getFastApiErrorMessage(error)
+        );
+
+        return false;
+    }
+};
+
+const isTemporaryFastApiError = (error) => {
+    const status = error.response?.status;
+
+    const message = String(
+        error.response?.data ||
+        error.message ||
+        ""
+    );
+
+    return (
+        status === 502 ||
+        status === 503 ||
+        status === 504 ||
+        message.includes("502") ||
+        message.includes("Bad Gateway") ||
+        message.includes("Application failed to respond") ||
+        message.includes("timeout")
+    );
+};
+
+const postIngestWithRetry = async ({
+    fastApiBaseUrl,
+    filePath,
+    originalName,
+    mimeType,
+    sourceType,
+    safeUserId,
+    safeCanvasId,
+}) => {
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            if (attempt === 1) {
+                await warmUpFastApi(fastApiBaseUrl);
+            }
+
+            if (attempt > 1) {
+                console.warn(
+                    `Retrying FastAPI ingest attempt ${attempt}/3...`
+                );
+
+                await warmUpFastApi(fastApiBaseUrl);
+                await sleep(8000);
+            }
+
+            const formData = new FormData();
+
+            formData.append("user_id", safeUserId);
+            formData.append("canvas_id", safeCanvasId);
+
+            formData.append(
+                "file",
+                fs.createReadStream(filePath),
+                {
+                    filename: originalName,
+                    contentType:
+                        mimeType ||
+                        "application/octet-stream",
+                }
+            );
+
+            if (sourceType === "pdf") {
+                formData.append("ocr_mode", "printed");
+            }
+
+            return await axios.post(
+                `${fastApiBaseUrl}/ingest`,
+                formData,
+                {
+                    headers: {
+                        ...formData.getHeaders(),
+
+                        ...(process.env.FASTAPI_API_KEY
+                            ? {
+                                  "X-API-Key":
+                                      process.env.FASTAPI_API_KEY,
+                              }
+                            : {}),
+                    },
+
+                    maxBodyLength: Infinity,
+                    maxContentLength: Infinity,
+                    timeout: 900000,
+                }
+            );
+        } catch (error) {
+            lastError = error;
+
+            const temporary =
+                isTemporaryFastApiError(error);
+
+            console.warn(
+                `FastAPI ingest attempt ${attempt}/3 failed:`,
+                getFastApiErrorMessage(error)
+            );
+
+            if (!temporary || attempt === 3) {
+                throw error;
+            }
+        }
+    }
+
+    throw lastError;
+};
+
 const storage =
     multer.diskStorage({
         destination: (
@@ -297,78 +423,15 @@ router.post("/ingest", authMiddleware, (req, res) => { upload.single("file")(req
                 */
                 if (fastApiBaseUrl) {
                     try {
-                        const formData =
-                            new FormData();
-
-                        formData.append(
-                            "user_id",
-                            safeUserId
-                        );
-
-                        formData.append(
-                            "canvas_id",
-                            safeCanvasId
-                        );
-
-                        formData.append(
-                            "file",
-                            fs.createReadStream(
-                                req.file.path
-                            ),
-                            {
-                                filename:
-                                    req.file
-                                        .originalname,
-
-                                contentType:
-                                    req.file
-                                        .mimetype ||
-                                    "application/octet-stream",
-                            }
-                        );
-
-                        /*
-                          OCR mode only makes sense
-                          for PDF files.
-                        */
-                        if (
-                            sourceType ===
-                            "pdf"
-                        ) {
-                            formData.append(
-                                "ocr_mode",
-                                "printed"
-                            );
-                        }
-
-                        const response =
-                            await axios.post(
-                                `${fastApiBaseUrl}/ingest`,
-                                formData,
-                                {
-                                    headers: {
-                                        ...formData.getHeaders(),
-
-                                        ...(process
-                                            .env
-                                            .FASTAPI_API_KEY
-                                            ? {
-                                                  "X-API-Key":
-                                                      process
-                                                          .env
-                                                          .FASTAPI_API_KEY,
-                                              }
-                                            : {}),
-                                    },
-
-                                    maxBodyLength:
-                                        Infinity,
-
-                                    maxContentLength:
-                                        Infinity,
-                                    timeout: 600000,
-                                }
-                            );
+                        const response = await postIngestWithRetry({
+                            fastApiBaseUrl,
+                            filePath: req.file.path,
+                            originalName: req.file.originalname,
+                            mimeType: req.file.mimetype,
+                            sourceType,
+                            safeUserId,
+                            safeCanvasId,
+                        });
 
                         ingestData = response.data || {};
 
