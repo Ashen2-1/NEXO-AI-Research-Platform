@@ -69,6 +69,41 @@ const parseUpstreamResponse = async (response) => {
 const sleep = (ms) =>
     new Promise((resolve) => setTimeout(resolve, ms));
 
+const warmupFastApi = async () => {
+    const fastApiBaseUrl = getFastApiBaseUrl();
+
+    for (let attempt = 1; attempt <= 6; attempt++) {
+        try {
+            console.log(`FastAPI warmup attempt ${attempt}/6`);
+
+            const response = await fetch(
+                `${fastApiBaseUrl}/health`,
+                {
+                    method: "GET",
+                }
+            );
+
+            if (response.ok) {
+                console.log("FastAPI warmup successful.");
+                return true;
+            }
+
+            console.log(
+                `FastAPI warmup returned ${response.status}`
+            );
+        } catch (error) {
+            console.log(
+                `FastAPI warmup attempt ${attempt} failed:`,
+                error.message
+            );
+        }
+
+        await sleep(10000);
+    }
+
+    return false;
+};
+
 const fetchFastApiWithRetry = async (
     targetUrl,
     requestOptions,
@@ -201,35 +236,20 @@ const normalizeSourceFilters = (
 };
 
 router.get("/warmup", authMiddleware, async (req, res) => {
-    const fastApiBaseUrl = getFastApiBaseUrl();
+    const isReady = await warmupFastApi();
 
-    try {
-        const response = await fetch(`${fastApiBaseUrl}/health`, {
-            method: "GET",
-        });
-
-        if (!response.ok) {
-            return res.status(502).json({
-                status: "warming",
-                message: "AI service is not ready yet.",
-            });
-        }
-
-        const data = await response.json().catch(() => ({}));
-
-        return res.json({
-            status: "ready",
-            message: "AI service is ready.",
-            data,
-        });
-    } catch (error) {
-        console.error("AI warmup error:", error);
-
-        return res.status(502).json({
+    if (!isReady) {
+        return res.status(202).json({
             status: "warming",
-            message: "AI service is waking up. Please try again shortly.",
+            message:
+                "AI service is still waking up. Please wait 30-60 seconds and try again.",
         });
     }
+
+    return res.json({
+        status: "ready",
+        message: "AI service is ready.",
+    });
 });
 
 router.post(
@@ -371,15 +391,39 @@ router.post(
         });
 
         try {
-            const { response, data } =
-                await fetchFastApiWithRetry(
+            let response = await fetch(
+                targetUrl,
+                {
+                    method: "POST",
+                    headers: buildFastApiHeaders(),
+                    body: formData.toString(),
+                }
+            );
+
+            if (
+                response.status === 502 ||
+                response.status === 503 ||
+                response.status === 504
+            ) {
+                console.log(
+                    `FastAPI temporary error ${response.status}. Warming up and retrying...`
+                );
+
+                await warmupFastApi();
+
+                response = await fetch(
                     targetUrl,
                     {
                         method: "POST",
                         headers: buildFastApiHeaders(),
                         body: formData.toString(),
-                    },
-                    fastApiBaseUrl
+                    }
+                );
+            }
+
+            const data =
+                await parseUpstreamResponse(
+                    response
                 );
 
             if (!response.ok) {

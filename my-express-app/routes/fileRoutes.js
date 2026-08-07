@@ -96,21 +96,39 @@ const getFastApiErrorMessage = (error) => {
 const sleep = (ms) =>
     new Promise((resolve) => setTimeout(resolve, ms));
 
-const warmUpFastApi = async (fastApiBaseUrl) => {
-    try {
-        await axios.get(`${fastApiBaseUrl}/health`, {
-            timeout: 30000,
-        });
+const getFastApiBaseUrl = () => {
+    const configuredUrl =
+        process.env.FASTAPI_BASE_URL?.trim();
 
-        return true;
-    } catch (error) {
-        console.warn(
-            "FastAPI warmup failed:",
-            getFastApiErrorMessage(error)
-        );
+    return (
+        configuredUrl || "http://127.0.0.1:8000"
+    ).replace(/\/+$/, "");
+};
 
-        return false;
+const warmupFastApi = async () => {
+    const fastApiBaseUrl = getFastApiBaseUrl();
+
+    for (let attempt = 1; attempt <= 6; attempt++) {
+        try {
+            console.log(`FastAPI warmup attempt ${attempt}/6`);
+
+            const response = await fetch(`${fastApiBaseUrl}/health`);
+
+            if (response.ok) {
+                console.log("FastAPI warmup successful.");
+                return true;
+            }
+        } catch (error) {
+            console.log(
+                `FastAPI warmup failed attempt ${attempt}:`,
+                error.message
+            );
+        }
+
+        await sleep(10000);
     }
+
+    return false;
 };
 
 const isTemporaryFastApiError = (error) => {
@@ -147,7 +165,7 @@ const postIngestWithRetry = async ({
     for (let attempt = 1; attempt <= 3; attempt++) {
         try {
             if (attempt === 1) {
-                await warmUpFastApi(fastApiBaseUrl);
+                await warmupFastApi();
             }
 
             if (attempt > 1) {
@@ -155,7 +173,7 @@ const postIngestWithRetry = async ({
                     `Retrying FastAPI ingest attempt ${attempt}/3...`
                 );
 
-                await warmUpFastApi(fastApiBaseUrl);
+                await warmupFastApi();
                 await sleep(8000);
             }
 
