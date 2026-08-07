@@ -66,98 +66,6 @@ const parseUpstreamResponse = async (response) => {
   };
 };
 
-const sleep = (ms) =>
-    new Promise((resolve) => setTimeout(resolve, ms));
-
-const warmupFastApi = async () => {
-    const fastApiBaseUrl = getFastApiBaseUrl();
-
-    for (let attempt = 1; attempt <= 6; attempt++) {
-        try {
-            console.log(`FastAPI warmup attempt ${attempt}/6`);
-
-            const response = await fetch(
-                `${fastApiBaseUrl}/health`,
-                {
-                    method: "GET",
-                }
-            );
-
-            if (response.ok) {
-                console.log("FastAPI warmup successful.");
-                return true;
-            }
-
-            console.log(
-                `FastAPI warmup returned ${response.status}`
-            );
-        } catch (error) {
-            console.log(
-                `FastAPI warmup attempt ${attempt} failed:`,
-                error.message
-            );
-        }
-
-        await sleep(10000);
-    }
-
-    return false;
-};
-
-const fetchFastApiWithRetry = async (
-    targetUrl,
-    requestOptions,
-    fastApiBaseUrl
-) => {
-    let lastResponse = null;
-    let lastData = null;
-
-    for (let attempt = 1; attempt <= 2; attempt++) {
-        const response = await fetch(targetUrl, requestOptions);
-        const data = await parseUpstreamResponse(response);
-
-        if (response.ok) {
-            return {
-                response,
-                data,
-            };
-        }
-
-        lastResponse = response;
-        lastData = data;
-
-        const isTemporaryServerError =
-            response.status === 502 ||
-            response.status === 503 ||
-            response.status === 504;
-
-        if (!isTemporaryServerError || attempt === 2) {
-            break;
-        }
-
-        console.warn(
-            `FastAPI temporary error ${response.status}. Warming up and retrying...`
-        );
-
-        try {
-            await fetch(`${fastApiBaseUrl}/health`, {
-                method: "GET",
-            });
-        } catch (warmupError) {
-            console.warn(
-                "FastAPI warmup before retry failed:",
-                warmupError
-            );
-        }
-
-        await sleep(6000);
-    }
-
-    return {
-        response: lastResponse,
-        data: lastData || {},
-    };
-};
 
 const normalizeChatHistory = (history) => {
     if (!Array.isArray(history)) {
@@ -463,27 +371,6 @@ router.post(
                     body: formData.toString(),
                 }
             );
-
-            if (
-                response.status === 502 ||
-                response.status === 503 ||
-                response.status === 504
-            ) {
-                console.log(
-                    `FastAPI temporary error ${response.status}. Warming up and retrying...`
-                );
-
-                await warmupFastApi();
-
-                response = await fetch(
-                    targetUrl,
-                    {
-                        method: "POST",
-                        headers: buildFastApiHeaders(),
-                        body: formData.toString(),
-                    }
-                );
-            }
 
             const data =
                 await parseUpstreamResponse(
