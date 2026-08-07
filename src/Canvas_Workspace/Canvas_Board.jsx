@@ -4309,6 +4309,33 @@ ${frameworkEditorDraft.slice(0, 60000)}
         };
     }, [notes, links, openedNote]);
 
+
+    useEffect(() => {
+        const warmUpAiService = async () => {
+            const token = localStorage.getItem("nexo_token");
+
+            if (!token) {
+                return;
+            }
+
+            try {
+                setIsAiWarmingUp(true);
+
+                await apiRequest("/ai/warmup", {
+                    method: "GET",
+                });
+
+                console.log("AI warmup completed.");
+            } catch (error) {
+                console.warn("AI warmup failed:", error);
+            } finally {
+                setIsAiWarmingUp(false);
+            }
+        };
+
+        warmUpAiService();
+    }, []);
+
     const handleUndo = async () => {
         /*
          * A ref lock is required here. React state does not change
