@@ -57,7 +57,7 @@ const parseUpstreamResponse = async (response) => {
   if (looksLikeHtml) {
     return {
       detail:
-        "AI service is temporarily unavailable. The RAG server returned an HTML error page instead of JSON.",
+        "AI is waking up. Please wait about one minute and try again.",
     };
   }
 
@@ -235,14 +235,77 @@ const normalizeSourceFilters = (
     ].slice(0, 20);
 };
 
-router.get("/warmup", authMiddleware, async (req, res) => {
-    const isReady = await warmupFastApi();
 
-    if (!isReady) {
+const sleep = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
+const waitForFastApiReady = async ({
+    maxAttempts = 18,
+    delayMs = 10000,
+} = {}) => {
+    const fastApiBaseUrl = getFastApiBaseUrl();
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        console.log(`FastAPI warmup attempt ${attempt}/${maxAttempts}`);
+
+        try {
+            const response = await fetch(`${fastApiBaseUrl}/health`, {
+                method: "GET",
+                headers: {
+                    "Cache-Control": "no-cache",
+                },
+            });
+
+            if (response.ok) {
+                console.log("FastAPI warmup successful.");
+                return true;
+            }
+
+            console.log(`FastAPI warmup returned ${response.status}`);
+        } catch (error) {
+            console.log("FastAPI warmup network error:", error.message);
+        }
+
+        if (attempt < maxAttempts) {
+            await sleep(delayMs);
+        }
+    }
+
+    return false;
+};
+
+const fetchFastApiWithWakeup = async (targetUrl, options) => {
+    let response = await fetch(targetUrl, options);
+
+    if (response.status !== 502 && response.status !== 503 && response.status !== 504) {
+        return response;
+    }
+
+    console.log(`FastAPI temporary error ${response.status}. Warming up and retrying...`);
+
+    const ready = await waitForFastApiReady({
+        maxAttempts: 18,
+        delayMs: 10000,
+    });
+
+    if (!ready) {
+        return response;
+    }
+
+    return fetch(targetUrl, options);
+};
+
+router.get("/warmup", authMiddleware, async (req, res) => {
+    const ready = await waitForFastApiReady({
+        maxAttempts: 18,
+        delayMs: 10000,
+    });
+
+    if (!ready) {
         return res.status(202).json({
             status: "warming",
             message:
-                "AI service is still waking up. Please wait 30-60 seconds and try again.",
+                "AI service is still waking up. Please try again in a moment.",
         });
     }
 
@@ -391,11 +454,12 @@ router.post(
         });
 
         try {
-            let response = await fetch(
+            const response = await fetchFastApiWithWakeup(
                 targetUrl,
                 {
                     method: "POST",
-                    headers: buildFastApiHeaders(),
+                    headers:
+                        buildFastApiHeaders(),
                     body: formData.toString(),
                 }
             );

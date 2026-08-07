@@ -4336,6 +4336,22 @@ ${frameworkEditorDraft.slice(0, 60000)}
         warmUpAiService();
     }, []);
 
+    useEffect(() => {
+        const warmupAi = async () => {
+            try {
+                await apiRequest("/ai/warmup", {
+                    method: "GET",
+                });
+
+                console.log("AI warmup completed.");
+            } catch (error) {
+                console.warn("AI warmup failed or still waking:", error.message);
+            }
+        };
+
+        warmupAi();
+    }, []);
+
     const handleUndo = async () => {
         /*
          * A ref lock is required here. React state does not change
