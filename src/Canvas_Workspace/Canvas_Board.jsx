@@ -341,6 +341,8 @@ function CanvasBoard(){
     const [redoStack, setRedoStack] = useState([]);
     const [isRestoringHistory, setIsRestoringHistory] = useState(false);
 
+    const [isAiWarmingUp, setIsAiWarmingUp] = useState(false);
+
     /*
      * React state is used to render the Undo/Redo buttons.
      * Refs are the synchronous source of truth used by event handlers,
@@ -4246,6 +4248,36 @@ ${frameworkEditorDraft.slice(0, 60000)}
             block: "end",
         });
     }, [chatMessages, isAiThinking]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const warmUpAiService = async () => {
+            try {
+                setIsAiWarmingUp(true);
+
+                await apiRequest("/ai/warmup", {
+                    method: "GET",
+                });
+            } catch (error) {
+                console.warn("AI warmup failed:", error.message);
+            } finally {
+                if (!cancelled) {
+                    setIsAiWarmingUp(false);
+                }
+            }
+        };
+
+        warmUpAiService();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+
+
+
     /***************************************************************************/
     /** When click "Delete" or "Backspace" it will delete the selected note */
     useEffect(() => {
@@ -5474,6 +5506,11 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                 <>
                                     <div className="Chat_Header">
                                         <h2>Start Chatting</h2>
+                                        {isAiWarmingUp && (
+                                            <span className="AI_Warmup_Status">
+                                                AI waking up...
+                                            </span>
+                                        )}
                                     </div>
 
                                     <div className="Chat_Body">

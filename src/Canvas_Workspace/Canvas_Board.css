@@ -2327,3 +2327,21 @@ body,
 .Header_Logo_Button:hover {
     opacity: 0.65;
 }
+
+
+.AI_Warmup_Status {
+    font-size: 12px;
+    color: #777;
+    background: #f1f1f1;
+    border: 1px solid #e1e1e1;
+    border-radius: 999px;
+    padding: 5px 10px;
+    margin-left: 12px;
+}
+
+.Chat_Header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}

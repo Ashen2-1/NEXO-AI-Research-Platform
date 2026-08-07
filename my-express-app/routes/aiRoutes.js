@@ -140,6 +140,38 @@ const normalizeSourceFilters = (
     ].slice(0, 20);
 };
 
+router.get("/warmup", authMiddleware, async (req, res) => {
+    const fastApiBaseUrl = getFastApiBaseUrl();
+
+    try {
+        const response = await fetch(`${fastApiBaseUrl}/health`, {
+            method: "GET",
+        });
+
+        if (!response.ok) {
+            return res.status(502).json({
+                status: "warming",
+                message: "AI service is not ready yet.",
+            });
+        }
+
+        const data = await response.json().catch(() => ({}));
+
+        return res.json({
+            status: "ready",
+            message: "AI service is ready.",
+            data,
+        });
+    } catch (error) {
+        console.error("AI warmup error:", error);
+
+        return res.status(502).json({
+            status: "warming",
+            message: "AI service is waking up. Please try again shortly.",
+        });
+    }
+});
+
 router.post(
     "/query-text",
     authMiddleware,
