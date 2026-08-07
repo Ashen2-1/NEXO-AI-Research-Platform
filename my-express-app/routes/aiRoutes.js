@@ -50,7 +50,9 @@ const parseUpstreamResponse = async (response) => {
   const looksLikeHtml =
     responseText.includes("<!DOCTYPE html") ||
     responseText.includes("<html") ||
-    responseText.includes("<title>502</title>");
+    responseText.includes("<title>502</title>") ||
+    responseText.includes("502 Bad Gateway") ||
+    responseText.includes("Application failed to respond");
 
   if (looksLikeHtml) {
     return {
@@ -62,6 +64,64 @@ const parseUpstreamResponse = async (response) => {
   return {
     detail: responseText.replace(/\s+/g, " ").slice(0, 500),
   };
+};
+
+const sleep = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchFastApiWithRetry = async (
+    targetUrl,
+    requestOptions,
+    fastApiBaseUrl
+) => {
+    let lastResponse = null;
+    let lastData = null;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        const response = await fetch(targetUrl, requestOptions);
+        const data = await parseUpstreamResponse(response);
+
+        if (response.ok) {
+            return {
+                response,
+                data,
+            };
+        }
+
+        lastResponse = response;
+        lastData = data;
+
+        const isTemporaryServerError =
+            response.status === 502 ||
+            response.status === 503 ||
+            response.status === 504;
+
+        if (!isTemporaryServerError || attempt === 2) {
+            break;
+        }
+
+        console.warn(
+            `FastAPI temporary error ${response.status}. Warming up and retrying...`
+        );
+
+        try {
+            await fetch(`${fastApiBaseUrl}/health`, {
+                method: "GET",
+            });
+        } catch (warmupError) {
+            console.warn(
+                "FastAPI warmup before retry failed:",
+                warmupError
+            );
+        }
+
+        await sleep(6000);
+    }
+
+    return {
+        response: lastResponse,
+        data: lastData || {},
+    };
 };
 
 const normalizeChatHistory = (history) => {
@@ -311,19 +371,15 @@ router.post(
         });
 
         try {
-            const response = await fetch(
-                targetUrl,
-                {
-                    method: "POST",
-                    headers:
-                        buildFastApiHeaders(),
-                    body: formData.toString(),
-                }
-            );
-
-            const data =
-                await parseUpstreamResponse(
-                    response
+            const { response, data } =
+                await fetchFastApiWithRetry(
+                    targetUrl,
+                    {
+                        method: "POST",
+                        headers: buildFastApiHeaders(),
+                        body: formData.toString(),
+                    },
+                    fastApiBaseUrl
                 );
 
             if (!response.ok) {
