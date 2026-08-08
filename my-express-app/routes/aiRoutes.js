@@ -1,5 +1,9 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
+import {
+    checkAiQuestionLimit,
+    incrementAiQuestions,
+} from "../utils/usageLimits.js";
 
 const router = express.Router();
 
@@ -257,6 +261,14 @@ router.post(
             req.user.id
         ).trim();
 
+        try {
+            await checkAiQuestionLimit(userId);
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({
+                error: error.message || "Usage limit check failed.",
+            });
+        }
+
         const canvasId =
             String(canvas_id || "default")
                 .trim()
@@ -387,6 +399,8 @@ router.post(
                             `AI service returned status ${response.status}.`,
                     });
             }
+
+            await incrementAiQuestions(userId);
 
             return res.json({
                 answer:

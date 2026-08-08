@@ -6,6 +6,10 @@ import FormData from "form-data";
 import axios from "axios";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { uploadFileToSupabaseStorage } from "../utils/supabaseStorage.js";
+import {
+    checkFileUploadLimit,
+    incrementFileUploads,
+} from "../utils/usageLimits.js";
 
 const router = express.Router();
 
@@ -319,7 +323,21 @@ const upload = multer({
     },
 });
 
-router.post("/ingest", authMiddleware, (req, res) => { upload.single("file")(req, res, async (uploadError) => {
+router.post(
+    "/ingest",
+    authMiddleware,
+    async (req, res) => {
+        const userId = String(req.user?.id || "").trim();
+
+        try {
+            await checkFileUploadLimit(userId);
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({
+                error: error.message || "Usage limit check failed.",
+            });
+        }
+
+        upload.single("file")(req, res, async (uploadError) => {
                 if (uploadError) {
                     if (
                         uploadError instanceof
@@ -486,6 +504,8 @@ router.post("/ingest", authMiddleware, (req, res) => { upload.single("file")(req
                     warning =
                         "The file was uploaded, but FASTAPI_BASE_URL is not configured, so it was not indexed by AI.";
                 }
+
+                await incrementFileUploads(safeUserId);
 
                 return res
                     .status(201)
