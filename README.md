@@ -1,4 +1,5 @@
 # NEXO — Multimodal AI Research Platform
+
 ![NEXO Workspace](src/assets/nexo-workspace.png)
 
 NEXO is a full-stack multimodal research platform that helps users organize sources, upload documents, explore databases, and interact with AI in a visually structured workspace.
