@@ -1271,10 +1271,94 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     /** When click the Note if the current note is selected then change back to light color else change to darker color */
+    const getLinkedNoteIds = (startNoteId) => {
+        const visited = new Set();
+        const queue = [String(startNoteId)];
+    
+        while (queue.length > 0) {
+            const currentId = queue.shift();
+    
+            if (visited.has(currentId)) {
+                continue;
+            }
+    
+            visited.add(currentId);
+    
+            links.forEach((link) => {
+                const fromId = String(link.fromNoteId);
+                const toId = String(link.toNoteId);
+    
+                if (fromId === currentId && !visited.has(toId)) {
+                    queue.push(toId);
+                }
+    
+                if (toId === currentId && !visited.has(fromId)) {
+                    queue.push(fromId);
+                }
+            });
+        }
+    
+        return visited;
+    };
+    
+    
     const handleNoteClick = (noteId) => {
-        setNotes((prevNotes) => 
-            prevNotes.map((note) => 
-                note.id === noteId ? { ...note, selected: !note.selected } : note
+        const clickedNote = notes.find(
+            (note) => String(note.id) === String(noteId)
+        );
+    
+        if (!clickedNote) {
+            return;
+        }
+    
+        if (clickedNote.clusterId) {
+            setNotes((prevNotes) =>
+                prevNotes.map((note) =>
+                    String(note.id) === String(noteId)
+                        ? {
+                              ...note,
+                              selected: !note.selected,
+                          }
+                        : note
+                )
+            );
+    
+            return;
+        }
+    
+        const linkedIds = getLinkedNoteIds(noteId);
+    
+        if (linkedIds.size === 1) {
+            setNotes((prevNotes) =>
+                prevNotes.map((note) =>
+                    String(note.id) === String(noteId)
+                        ? {
+                              ...note,
+                              selected: !note.selected,
+                          }
+                        : note
+                )
+            );
+    
+            return;
+        }
+    
+        const linkedNotes = notes.filter((note) =>
+            linkedIds.has(String(note.id))
+        );
+    
+        const allSelected = linkedNotes.every(
+            (note) => note.selected
+        );
+    
+        setNotes((prevNotes) =>
+            prevNotes.map((note) =>
+                linkedIds.has(String(note.id))
+                    ? {
+                          ...note,
+                          selected: !allSelected,
+                      }
+                    : note
             )
         );
     };
