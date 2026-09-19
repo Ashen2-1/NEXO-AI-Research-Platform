@@ -264,7 +264,11 @@ function LoginPage() {
                     </ul>
                 </section>
 
-                <form className="Login_Card" onSubmit={handleAuthSubmit}>
+                <form
+                    className="Login_Card"
+                    onSubmit={handleAuthSubmit}
+                    autoComplete="on"
+                >
                     <div className="Login_Card_Heading">
                         <h2>{isSignupMode ? "Create account" : "Welcome"}</h2>
                         <p>
@@ -279,6 +283,7 @@ function LoginPage() {
                     </label>
                     <input
                         id="login-email"
+                        name="email"
                         className="Login_Input"
                         type="email"
                         placeholder="Email"
@@ -294,6 +299,7 @@ function LoginPage() {
                     </label>
                     <input
                         id="login-password"
+                        name="password"
                         className="Login_Input"
                         type="password"
                         placeholder="Password"
@@ -315,6 +321,7 @@ function LoginPage() {
                             </label>
                             <input
                                 id="login-confirm-password"
+                                name="confirm-password"
                                 className="Login_Input"
                                 type="password"
                                 placeholder="Confirm password"
