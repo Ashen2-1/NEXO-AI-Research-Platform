@@ -67,7 +67,7 @@ const getFileExtension = (
   );
 };
 
-  const maxSize = 10 * 1024 * 1024;
+  const maxSize = 50 * 1024 * 1024;
 
   const validateFile = (
     selectedFile
@@ -94,7 +94,7 @@ const getFileExtension = (
       maxSize
     ) {
       alert(
-        "File must be under 10MB."
+        "File must be under 50MB."
       );
   
       return false;
@@ -332,7 +332,7 @@ const getFileExtension = (
             </div>
 
             <div className="upload-sub-text">
-              PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX (Max 10MB)
+              PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX (Max 50MB)
             </div>
 
             {selectedFiles.length > 0 && (

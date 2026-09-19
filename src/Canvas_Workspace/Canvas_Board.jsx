@@ -254,6 +254,16 @@ function CanvasBoard(){
     const [notes, setNotes] = useState([]);
     const [links, setLinks] = useState([]);
 
+    const [clusterNames, setClusterNames] = useState(() => {
+        try {
+            return JSON.parse(
+                localStorage.getItem("nexo_cluster_names") || "{}"
+            );
+        } catch {
+            return {};
+        }
+    });
+
     const [sourceSearchQuery, setSourceSearchQuery] = useState("");
 
     const [showUploadModal, setShowUploadModal] = useState(false);
@@ -402,6 +412,51 @@ function CanvasBoard(){
 
     //     setNotes(formattedNotes);
     // };
+    const saveClusterName = (clusterId, name) => {
+        const trimmedName = name.trim();
+    
+        if (!trimmedName) {
+            return;
+        }
+    
+        setClusterNames((prev) => {
+            const next = {
+                ...prev,
+                [clusterId]: trimmedName,
+            };
+    
+            localStorage.setItem(
+                "nexo_cluster_names",
+                JSON.stringify(next)
+            );
+    
+            return next;
+        });
+    };
+    
+    
+    const handleRenameCluster = (event, cluster) => {
+        event.stopPropagation();
+    
+        const currentName =
+            clusterNames[cluster.id] ||
+            cluster.label;
+    
+        const newName = window.prompt(
+            "Cluster name:",
+            currentName
+        );
+    
+        if (newName === null) {
+            return;
+        }
+    
+        saveClusterName(
+            cluster.id,
+            newName
+        );
+    };
+    
     const getSnapshot = () => ({
         notes: notes.map((note) => ({
             ...note,
@@ -1271,10 +1326,94 @@ function CanvasBoard(){
     };
     /***************************************************************************/
     /** When click the Note if the current note is selected then change back to light color else change to darker color */
+    const getLinkedNoteIds = (startNoteId) => {
+        const visited = new Set();
+        const queue = [String(startNoteId)];
+    
+        while (queue.length > 0) {
+            const currentId = queue.shift();
+    
+            if (visited.has(currentId)) {
+                continue;
+            }
+    
+            visited.add(currentId);
+    
+            links.forEach((link) => {
+                const fromId = String(link.fromNoteId);
+                const toId = String(link.toNoteId);
+    
+                if (fromId === currentId && !visited.has(toId)) {
+                    queue.push(toId);
+                }
+    
+                if (toId === currentId && !visited.has(fromId)) {
+                    queue.push(fromId);
+                }
+            });
+        }
+    
+        return visited;
+    };
+    
+    
     const handleNoteClick = (noteId) => {
-        setNotes((prevNotes) => 
-            prevNotes.map((note) => 
-                note.id === noteId ? { ...note, selected: !note.selected } : note
+        const clickedNote = notes.find(
+            (note) => String(note.id) === String(noteId)
+        );
+    
+        if (!clickedNote) {
+            return;
+        }
+    
+        if (clickedNote.clusterId) {
+            setNotes((prevNotes) =>
+                prevNotes.map((note) =>
+                    String(note.id) === String(noteId)
+                        ? {
+                              ...note,
+                              selected: !note.selected,
+                          }
+                        : note
+                )
+            );
+    
+            return;
+        }
+    
+        const linkedIds = getLinkedNoteIds(noteId);
+    
+        if (linkedIds.size === 1) {
+            setNotes((prevNotes) =>
+                prevNotes.map((note) =>
+                    String(note.id) === String(noteId)
+                        ? {
+                              ...note,
+                              selected: !note.selected,
+                          }
+                        : note
+                )
+            );
+    
+            return;
+        }
+    
+        const linkedNotes = notes.filter((note) =>
+            linkedIds.has(String(note.id))
+        );
+    
+        const allSelected = linkedNotes.every(
+            (note) => note.selected
+        );
+    
+        setNotes((prevNotes) =>
+            prevNotes.map((note) =>
+                linkedIds.has(String(note.id))
+                    ? {
+                          ...note,
+                          selected: !allSelected,
+                      }
+                    : note
             )
         );
     };
@@ -3340,6 +3479,8 @@ function CanvasBoard(){
                 id: clusterId,
                 label: `Cluster ${index + 1}`,
                 noteCount: groupNotes.length,
+
+                noteIds: groupNotes.map((note) => note.id),
     
                 x: minX - horizontalPadding,
                 y: minY - topPadding,
@@ -4519,6 +4660,33 @@ ${frameworkEditorDraft.slice(0, 60000)}
         }
     };
 
+    const handleClusterBoxClick = (event, cluster) => {
+        event.stopPropagation();
+    
+        const clusterNoteIds = new Set(
+            cluster.noteIds.map((id) => String(id))
+        );
+    
+        const clusterNotes = notes.filter((note) =>
+            clusterNoteIds.has(String(note.id))
+        );
+    
+        const allSelected = clusterNotes.every(
+            (note) => note.selected
+        );
+    
+        setNotes((prevNotes) =>
+            prevNotes.map((note) =>
+                clusterNoteIds.has(String(note.id))
+                    ? {
+                          ...note,
+                          selected: !allSelected,
+                      }
+                    : note
+            )
+        );
+    };
+
     const handleCluster = async () => {
         const selected = notes.filter(
             (note) => note.selected
@@ -5291,6 +5459,11 @@ ${frameworkEditorDraft.slice(0, 60000)}
                             <div
                                 key={cluster.id}
                                 className="Canvas_Cluster_Box"
+
+                                onClick={(event) =>
+                                    handleClusterBoxClick(event, cluster)
+                                }
+
                                 style={{
                                     left: `${cluster.x}px`,
                                     top: `${cluster.y}px`,
@@ -5298,8 +5471,17 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                     height: `${cluster.height}px`,
                                 }}
                             >
-                                <span className="Canvas_Cluster_Label">
-                                    {cluster.label} ·{" "}
+                                <span
+                                    className="Canvas_Cluster_Label"
+
+                                    onDoubleClick={(event) =>
+                                        handleRenameCluster(event, cluster)
+                                    }
+
+                                    title="Double-click to rename"
+                                >
+                                    {clusterNames[cluster.id] || cluster.label}
+                                    {" · "}
                                     {cluster.noteCount} notes
                                 </span>
                             </div>

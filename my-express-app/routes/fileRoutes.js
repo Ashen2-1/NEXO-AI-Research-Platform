@@ -23,7 +23,7 @@ fs.mkdirSync(uploadDir, {
 });
 
 const MAX_FILE_SIZE =
-    10 * 1024 * 1024;
+    50 * 1024 * 1024;
 
 const SOURCE_TYPE_BY_EXTENSION = {
     ".pdf": "pdf",
@@ -349,7 +349,7 @@ router.post(
                             .status(413)
                             .json({
                                 error:
-                                    "File must be under 10MB.",
+                                    "File must be under 50MB.",
                             });
                     }
 
