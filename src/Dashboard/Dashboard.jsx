@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiRequest } from "../api.js";
+import { apiRequest, clearAuthSession } from "../api.js";
 import "./Dashboard.css";
 
 function Dashboard() {
@@ -181,8 +181,7 @@ function Dashboard() {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem("nexo_token");
-        localStorage.removeItem("nexo_user");
+        clearAuthSession();
         navigate("/login");
     };
 

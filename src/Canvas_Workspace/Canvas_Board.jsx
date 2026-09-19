@@ -6,7 +6,12 @@ import DatabaseSearch from "../Upload_Section/databaseSearch.jsx";
 import "./Canvas_Board.css"
 import FrameworkPanel from "./FrameworkPanel.jsx";
 //import { supabase } from "../lib/supabase";
-import { apiRequest } from "../api.js";
+import {
+    apiRequest,
+    clearAuthSession,
+    getAuthToken,
+    getAuthUser,
+} from "../api.js";
 import ReactMarkdown from "react-markdown";
 
 import { TfiAlignJustify } from "react-icons/tfi";
@@ -192,11 +197,10 @@ function CanvasBoard(){
     const [searchParams, setSearchParams] = useSearchParams();
     const currentCanvasId = canvasId || "default";
 
-    const currentUser = JSON.parse(localStorage.getItem("nexo_user") || "null");
+    const currentUser = getAuthUser();
 
     const handleLogout = () => {
-        localStorage.removeItem("nexo_token");
-        localStorage.removeItem("nexo_user");
+        clearAuthSession();
         window.location.href = "/login";
     };
 
@@ -4312,7 +4316,7 @@ ${frameworkEditorDraft.slice(0, 60000)}
 
     useEffect(() => {
         const warmUpAiService = async () => {
-            const token = localStorage.getItem("nexo_token");
+            const token = getAuthToken();
 
             if (!token) {
                 return;

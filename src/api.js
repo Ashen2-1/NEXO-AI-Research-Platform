@@ -1,4 +1,6 @@
 const DEFAULT_API_BASE_URL = "http://localhost:5000/api";
+const AUTH_TOKEN_KEY = "nexo_token";
+const AUTH_USER_KEY = "nexo_user";
 
 export const API_BASE_URL = (
     import.meta.env.VITE_API_URL || DEFAULT_API_BASE_URL
@@ -10,12 +12,42 @@ export function buildApiUrl(path = "") {
 }
 
 export function getAuthToken() {
-    return localStorage.getItem("nexo_token");
+    return (
+        localStorage.getItem(AUTH_TOKEN_KEY) ||
+        sessionStorage.getItem(AUTH_TOKEN_KEY)
+    );
+}
+
+export function getAuthUser() {
+    const serializedUser =
+        localStorage.getItem(AUTH_USER_KEY) ||
+        sessionStorage.getItem(AUTH_USER_KEY);
+
+    if (!serializedUser) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(serializedUser);
+    } catch {
+        return null;
+    }
+}
+
+export function storeAuthSession({ token, user, remember = false }) {
+    clearAuthSession();
+
+    const storage = remember ? localStorage : sessionStorage;
+
+    storage.setItem(AUTH_TOKEN_KEY, token);
+    storage.setItem(AUTH_USER_KEY, JSON.stringify(user));
 }
 
 export function clearAuthSession() {
-    localStorage.removeItem("nexo_token");
-    localStorage.removeItem("nexo_user");
+    for (const storage of [localStorage, sessionStorage]) {
+        storage.removeItem(AUTH_TOKEN_KEY);
+        storage.removeItem(AUTH_USER_KEY);
+    }
 }
 
 function decodeJwtPayload(token) {
