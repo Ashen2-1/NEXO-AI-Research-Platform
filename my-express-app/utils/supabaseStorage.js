@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs/promises";
-import path from "path";
+import { getStorageMimeType } from "./fileTypes.js";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -36,11 +36,7 @@ export const uploadFileToSupabaseStorage = async ({
   const safeName = sanitizeFileName(originalName);
   const fileBuffer = await fs.readFile(localFilePath);
 
-  const extension = path.extname(safeName).toLowerCase();
-  const contentType =
-    extension === ".pdf"
-      ? "application/pdf"
-      : "application/octet-stream";
+  const contentType = getStorageMimeType(safeName);
 
   const storagePath = [
     String(userId),
