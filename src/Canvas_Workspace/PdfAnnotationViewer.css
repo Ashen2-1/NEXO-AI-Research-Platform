@@ -1,0 +1,300 @@
+.Pdf_Annotation_Viewer {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: #eceae5;
+    border: 1px solid #d2cec5;
+    border-radius: 12px;
+    overflow: hidden;
+    color: #272727;
+}
+
+.Pdf_Annotation_Toolbar,
+.Pdf_Annotation_StatusBar {
+    min-height: 46px;
+    padding: 8px 12px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #fff;
+    border-bottom: 1px solid #d7d3ca;
+    flex-shrink: 0;
+}
+
+.Pdf_Annotation_PageControls,
+.Pdf_Annotation_ZoomControls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.Pdf_Annotation_Toolbar button,
+.Pdf_Annotation_Editor button {
+    border: 1px solid #d5d1c8;
+    border-radius: 7px;
+    background: #fff;
+    color: #2c2c2c;
+    cursor: pointer;
+}
+
+.Pdf_Annotation_Toolbar button {
+    width: 30px;
+    height: 28px;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.Pdf_Annotation_Toolbar button:disabled,
+.Pdf_Annotation_Editor button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.Pdf_Annotation_Hint {
+    padding: 7px 12px;
+    background: #f6f3eb;
+    border-bottom: 1px solid #ddd8ce;
+    color: #5e5a52;
+    font-size: 12px;
+    line-height: 1.4;
+    flex-shrink: 0;
+}
+
+.Pdf_Annotation_Message {
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    flex-shrink: 0;
+}
+
+.Pdf_Annotation_Message_Error {
+    background: #fff0f0;
+    color: #9b2727;
+    border-bottom: 1px solid #efcaca;
+}
+
+.Pdf_Annotation_Message_Warning {
+    background: #fff7d6;
+    color: #6e5813;
+    border-bottom: 1px solid #eadb9b;
+}
+
+.Pdf_Annotation_Editor {
+    padding: 12px;
+    background: #fff;
+    border-bottom: 1px solid #d7d3ca;
+    display: grid;
+    gap: 9px;
+    flex-shrink: 0;
+}
+
+.Pdf_Annotation_Editor_Header,
+.Pdf_Annotation_Editor_Actions,
+.Pdf_Annotation_Editor_Options {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.Pdf_Annotation_Editor_Header {
+    justify-content: space-between;
+    font-size: 13px;
+}
+
+.Pdf_Annotation_Editor_Header button {
+    width: 26px;
+    height: 26px;
+    font-size: 18px;
+}
+
+.Pdf_Annotation_Editor blockquote {
+    max-height: 52px;
+    margin: 0;
+    padding: 7px 9px;
+    overflow: auto;
+    border-left: 3px solid #8a8172;
+    background: #f6f4ef;
+    color: #4b4741;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.Pdf_Annotation_Editor_Options {
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.Pdf_Annotation_Editor_Options label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #5a554d;
+    font-size: 12px;
+}
+
+.Pdf_Annotation_Editor select {
+    height: 30px;
+    border: 1px solid #d5d1c8;
+    border-radius: 6px;
+    background: #fff;
+    padding: 0 8px;
+}
+
+.Pdf_Annotation_Colors {
+    display: flex;
+    gap: 6px;
+}
+
+.Pdf_Annotation_Colors button {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+}
+
+.Pdf_Annotation_Colors button.is-active {
+    border-color: #222;
+    box-shadow: 0 0 0 2px #fff inset;
+}
+
+.Pdf_Annotation_Editor textarea {
+    width: 100%;
+    min-height: 64px;
+    max-height: 130px;
+    resize: vertical;
+    padding: 9px 10px;
+    box-sizing: border-box;
+    border: 1px solid #d5d1c8;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.Pdf_Annotation_Editor_Actions {
+    justify-content: flex-end;
+}
+
+.Pdf_Annotation_Editor_Actions button {
+    min-height: 32px;
+    padding: 0 12px;
+}
+
+.Pdf_Annotation_Editor_Actions .Pdf_Annotation_Delete {
+    margin-right: auto;
+    color: #a82d2d;
+    border-color: #e1bcbc;
+}
+
+.Pdf_Annotation_Editor_Actions .Pdf_Annotation_Save {
+    background: #1e1e1e;
+    border-color: #1e1e1e;
+    color: #fff;
+}
+
+.Pdf_Annotation_Viewport {
+    flex: 1;
+    min-height: 260px;
+    overflow: auto;
+    padding: 16px;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.Pdf_Annotation_PageFrame {
+    position: relative;
+    display: block;
+    width: max-content;
+    margin: 0 auto;
+    line-height: 0;
+    box-shadow: 0 5px 22px rgba(42, 38, 31, 0.2);
+    background: #fff;
+}
+
+.Pdf_Annotation_PageFrame .react-pdf__Document,
+.Pdf_Annotation_PageFrame .react-pdf__Page {
+    display: inline-block;
+}
+
+.Pdf_Annotation_PageFrame canvas {
+    display: block;
+}
+
+.Pdf_Annotation_Overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.Pdf_Annotation_Mark {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background-color: transparent;
+    cursor: pointer;
+    pointer-events: auto;
+    mix-blend-mode: multiply;
+}
+
+.Pdf_Annotation_Mark:hover,
+.Pdf_Annotation_Mark:focus-visible {
+    outline: 2px solid rgba(31, 31, 31, 0.72);
+    outline-offset: 1px;
+}
+
+.Pdf_Annotation_Mark_underline {
+    border-bottom-width: 3px;
+    border-bottom-style: solid;
+    border-radius: 0;
+}
+
+.Pdf_Annotation_Mark.is-pending {
+    outline: 2px dashed #2d2d2d;
+    outline-offset: 1px;
+}
+
+.Pdf_Annotation_Loading {
+    width: 360px;
+    max-width: 70vw;
+    min-height: 440px;
+    display: grid;
+    place-items: center;
+    background: #fff;
+    color: #6c675e;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.Pdf_Annotation_StatusBar {
+    min-height: 38px;
+    border-top: 1px solid #d7d3ca;
+    border-bottom: 0;
+    color: #68635b;
+    font-size: 11px;
+}
+
+.Pdf_Annotation_StatusBar a {
+    color: #38342e;
+    font-weight: 650;
+}
+
+@media (max-width: 760px) {
+    .Pdf_Annotation_Editor_Options {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .Pdf_Annotation_StatusBar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

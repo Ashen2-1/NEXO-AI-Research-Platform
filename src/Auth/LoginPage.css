@@ -1,214 +1,502 @@
 .Login_Page {
+    --login-ink: #141414;
+    --login-muted: #666666;
+    --login-border: #d8d8d8;
+    --login-surface: #ffffff;
     min-height: 100vh;
-    background-color: #ffffff;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
+    background: var(--login-surface);
+    color: var(--login-ink);
     font-family: Inter, Arial, Helvetica, sans-serif;
 }
 
-.Login_Brand {
-    margin: 0px 0px 44px 0px;
+.Login_Header {
+    min-height: 100px;
+    padding: 0 44px;
+    border-bottom: 1px solid #e5e5e5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+}
 
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: 3px;
-    color: #000;
+.Login_Logo {
+    color: var(--login-ink);
+    text-decoration: none;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.Login_Logo strong {
+    font-size: 35px;
+    line-height: 0.9;
+    font-weight: 900;
+    letter-spacing: -2.4px;
+}
+
+.Login_Logo span {
+    color: #777777;
+    font-size: 8px;
+    letter-spacing: 0.01em;
+}
+
+.Login_Navigation {
+    display: flex;
+    align-items: center;
+    gap: 38px;
+}
+
+.Login_Navigation a,
+.Login_Header_Link,
+.Login_Header_Cta {
+    color: #3f3f3f;
+    background: transparent;
+    border: 0;
+    font: inherit;
+    font-size: 13px;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.Login_Header_Link {
+    padding: 11px 22px;
+    border: 1px solid #dedede;
+    border-radius: 4px;
+}
+
+.Login_Header_Cta {
+    padding: 12px 24px;
+    border-radius: 4px;
+    background: #111111;
+    color: #ffffff;
+}
+
+.Login_Main {
+    min-height: 740px;
+    padding: 70px clamp(52px, 8vw, 145px) 86px;
+    display: grid;
+    grid-template-columns: minmax(360px, 1fr) minmax(400px, 448px);
+    align-items: center;
+    column-gap: clamp(72px, 12vw, 210px);
+}
+
+.Login_Hero {
+    max-width: 520px;
+}
+
+.Login_Hero h1 {
+    margin: 0 0 28px;
+    font-size: clamp(54px, 5.3vw, 76px);
+    font-weight: 800;
+    letter-spacing: -0.055em;
+    line-height: 0.99;
+}
+
+.Login_Hero > p {
+    max-width: 485px;
+    margin: 0;
+    color: var(--login-muted);
+    font-size: 16px;
+    line-height: 1.65;
+}
+
+.Login_Hero_Actions {
+    margin-top: 34px;
+    display: flex;
+    gap: 16px;
+}
+
+.Login_Primary_Action,
+.Login_Secondary_Action {
+    min-width: 130px;
+    min-height: 48px;
+    padding: 0 22px;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font: inherit;
+    font-size: 13px;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.Login_Primary_Action {
+    border: 1px solid #1a1a1a;
+    background: #1a1a1a;
+    color: #ffffff;
+}
+
+.Login_Secondary_Action {
+    border: 1px solid #d8d8d8;
+    background: #ffffff;
+    color: #2a2a2a;
+}
+
+.Login_Trust_List {
+    margin: 42px 0 0;
+    padding: 0;
+    color: #757575;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 34px;
+    list-style: none;
+    font-size: 11px;
+}
+
+.Login_Trust_List li::before {
+    content: "•";
+    margin-right: 9px;
+    color: #202020;
 }
 
 .Login_Card {
-    width: 480px;
-    min-height: 580px;
-
-    border: 1px solid #d8d8d8;
-    border-radius: 20px;
-
-    padding: 64px 54px;
-    box-sizing: border-box;
-
-    background-color: white;
+    width: 100%;
+    min-height: 502px;
+    padding: 32px;
+    border: 1px solid #ececec;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
 }
 
-.Login_Card h1 {
-    margin: 0px 0px 12px 0px;
-
-    font-size: 32px;
-    font-weight: 400;
-    color: #000;
+.Login_Card_Heading {
+    margin-bottom: 26px;
 }
 
-.Login_Subtitle {
-    margin: 0px 0px 40px 0px;
+.Login_Card h2 {
+    margin: 0 0 8px;
+    font-size: 31px;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+}
 
+.Login_Card_Heading p {
+    margin: 0;
+    color: var(--login-muted);
     font-size: 16px;
-    color: #555;
 }
 
-.Login_Label {
-    display: block;
-    margin-bottom: 12px;
-
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    color: #000;
+.Login_Visually_Hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .Login_Input {
     width: 100%;
-    height: 58px;
-
-    border: 1px solid #bdbdbd;
-    border-radius: 12px;
-
-    padding: 0px 16px;
-    box-sizing: border-box;
-
+    height: 52px;
+    margin-bottom: 16px;
+    padding: 0 16px;
+    border: 1px solid var(--login-border);
+    border-radius: 9px;
+    background: #ffffff;
+    color: var(--login-ink);
+    font: inherit;
     font-size: 16px;
     outline: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
 
-    margin-bottom: 26px;
+.Login_Input::placeholder {
+    color: #929292;
 }
 
 .Login_Input:focus {
-    border-color: #000;
+    border-color: #1d1d1d;
+    box-shadow: 0 0 0 3px rgba(20, 20, 20, 0.08);
 }
 
-.Login_Row {
+.Login_Input:disabled {
+    background: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.Login_Options_Row {
+    min-height: 24px;
+    margin: -2px 0 16px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.Login_Remember_Option {
+    color: #585858;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.Login_Remember_Option input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: #1a1a1a;
 }
 
 .Login_Forgot_Button {
-    border: none;
+    padding: 0;
+    border: 0;
     background: none;
-    padding: 0px;
-
-    color: #444;
-    font-size: 14px;
+    color: #565656;
+    font: inherit;
+    font-size: 13px;
     cursor: pointer;
+}
+
+.Login_Forgot_Button:hover,
+.Login_Signup_Text button:hover {
+    text-decoration: underline;
+}
+
+.Login_Error_Message {
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: #fff2f2;
+    color: #a72626;
+    font-size: 13px;
+    line-height: 1.4;
 }
 
 .Login_Continue_Button {
     width: 100%;
-    height: 56px;
-
-    margin-top: 6px;
-
-    border: none;
-    border-radius: 10px;
-
-    background-color: #000;
-    color: white;
-
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-
+    height: 50px;
+    border: 0;
+    border-radius: 8px;
+    background: #3f3f3f;
+    color: #ffffff;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 500;
     cursor: pointer;
+    transition: background-color 160ms ease, transform 160ms ease;
 }
 
-.Login_Continue_Button:hover {
-    background-color: #222;
+.Login_Continue_Button:hover:not(:disabled) {
+    background: #111111;
+}
+
+.Login_Continue_Button:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.Login_Continue_Button:disabled,
+.Login_Forgot_Button:disabled,
+.Login_Signup_Text button:disabled {
+    opacity: 0.58;
+    cursor: not-allowed;
 }
 
 .Login_Divider {
+    margin: 22px 0;
     display: flex;
     align-items: center;
-    gap: 22px;
-
-    margin: 40px 0px;
+    gap: 16px;
 }
 
 .Login_Divider span {
     flex: 1;
     height: 1px;
-    background-color: #e0e0e0;
+    background: #e5e5e5;
 }
 
 .Login_Divider p {
     margin: 0;
-    color: #888;
-    font-size: 14px;
+    color: #777777;
+    font-size: 15px;
 }
 
-.Login_Google_Button {
+.Login_Google_Button_Host {
+    width: 100%;
+    min-height: 44px;
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.Login_Google_Button_Host.is-loading {
+    opacity: 0.58;
+    pointer-events: none;
+}
+
+.Login_Google_Fallback {
     width: 100%;
     height: 50px;
-
-    border: 1px solid #c9c9c9;
-    border-radius: 10px;
-
-    background-color: white;
-
-    font-size: 18px;
-    font-weight: 540;
-
+    border: 1px solid var(--login-border);
+    border-radius: 8px;
+    background: #ffffff;
+    color: #333333;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 16px;
-
-    cursor: pointer;
+    gap: 12px;
+    font: inherit;
+    font-size: 16px;
 }
 
-.Login_Google_Button:hover {
-    background-color: #f7f7f7;
-}
-
-.Login_Google_Icon {
-    font-size: 25px;
+.Login_Google_Fallback span {
+    color: #4285f4;
+    font-size: 19px;
     font-weight: 700;
-
-    padding-top: 3px;
-    padding-left: 3px;
 }
 
 .Login_Signup_Text {
-    margin: 44px 0px 0px 0px;
-
+    margin: 22px 0 0;
+    color: #656565;
     text-align: center;
-    font-size: 16px;
-    color: #555;
-}
-
-.Login_Signup_Text button {
-    border: none;
-    background: none;
-    padding: 0px;
-
-    font-size: 16px;
-    font-weight: 600;
-    color: #000;
-    cursor: pointer;
-}
-
-.Login_Error_Message {
-    margin: -12px 0px 18px 0px;
-    color: #c62828;
-    font-size: 14px;
-    line-height: 1.4;
-}
-
-.Login_Continue_Button:disabled {
-    opacity: 0.65;
-    cursor: not-allowed;
-}
-
-.Login_Password_Hint {
-    margin: -14px 0 22px 0;
-    color: #777777;
     font-size: 13px;
 }
 
-.Login_Signup_Text {
-    margin-top: 34px;
+.Login_Signup_Text button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #202020;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
 }
 
-.Login_Signup_Text button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+.Login_Footer {
+    min-height: 182px;
+    padding: 44px clamp(44px, 8vw, 145px);
+    border-top: 1px solid #eeeeee;
+    background: #f6f6f5;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 60px;
+}
+
+.Login_Footer_Brand strong {
+    font-size: 20px;
+    letter-spacing: -0.7px;
+}
+
+.Login_Footer_Brand p {
+    max-width: 310px;
+    margin: 12px 0 0;
+    color: #777777;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.Login_Footer_Links {
+    display: flex;
+    gap: 90px;
+}
+
+.Login_Footer_Links div {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    color: #777777;
+    font-size: 12px;
+}
+
+.Login_Footer_Links strong {
+    margin-bottom: 2px;
+    color: #2b2b2b;
+    font-size: 12px;
+}
+
+@media (max-width: 900px) {
+    .Login_Header {
+        min-height: 72px;
+        padding: 0 22px;
+    }
+
+    .Login_Logo strong {
+        font-size: 25px;
+        letter-spacing: -1.7px;
+    }
+
+    .Login_Logo span,
+    .Login_Navigation a,
+    .Login_Header_Link {
+        display: none;
+    }
+
+    .Login_Header_Cta {
+        padding: 9px 17px;
+        font-size: 12px;
+    }
+
+    .Login_Main {
+        min-height: auto;
+        padding: 46px 22px 76px;
+        grid-template-columns: 1fr;
+        row-gap: 62px;
+    }
+
+    .Login_Hero {
+        max-width: 520px;
+    }
+
+    .Login_Hero h1 {
+        font-size: clamp(43px, 13vw, 58px);
+    }
+
+    .Login_Card {
+        max-width: 448px;
+        margin: 0 auto;
+    }
+
+    .Login_Footer {
+        padding: 42px 26px;
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
+    .Login_Main {
+        padding-right: 16px;
+        padding-left: 16px;
+    }
+
+    .Login_Hero_Actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .Login_Trust_List {
+        display: grid;
+        gap: 10px;
+    }
+
+    .Login_Card {
+        min-height: 0;
+        padding: 28px 20px;
+        border-radius: 13px;
+    }
+
+    .Login_Card h2 {
+        font-size: 28px;
+    }
+
+    .Login_Options_Row {
+        align-items: flex-start;
+    }
+
+    .Login_Footer_Links {
+        width: 100%;
+        gap: 54px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .Login_Input,
+    .Login_Continue_Button {
+        transition: none;
+    }
 }

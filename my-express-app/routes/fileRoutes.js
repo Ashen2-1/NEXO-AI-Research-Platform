@@ -7,6 +7,11 @@ import axios from "axios";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { uploadFileToSupabaseStorage } from "../utils/supabaseStorage.js";
 import {
+    ALLOWED_EXTENSIONS,
+    getFileExtension,
+    getSourceType,
+} from "../utils/fileTypes.js";
+import {
     checkFileUploadLimit,
     incrementFileUploads,
 } from "../utils/usageLimits.js";
@@ -24,46 +29,6 @@ fs.mkdirSync(uploadDir, {
 
 const MAX_FILE_SIZE =
     50 * 1024 * 1024;
-
-const SOURCE_TYPE_BY_EXTENSION = {
-    ".pdf": "pdf",
-
-    ".doc": "word",
-    ".docx": "word",
-
-    ".xls": "excel",
-    ".xlsx": "excel",
-
-    ".ppt": "powerpoint",
-    ".pptx": "powerpoint",
-};
-
-const ALLOWED_EXTENSIONS = new Set(
-    Object.keys(
-        SOURCE_TYPE_BY_EXTENSION
-    )
-);
-
-const getFileExtension = (
-    fileName = ""
-) => {
-    return path
-        .extname(fileName)
-        .toLowerCase();
-};
-
-const getSourceType = (
-    fileName = ""
-) => {
-    const extension =
-        getFileExtension(fileName);
-
-    return (
-        SOURCE_TYPE_BY_EXTENSION[
-            extension
-        ] || "document"
-    );
-};
 
 const getFastApiErrorMessage = (error) => {
   const status = error.response?.status;

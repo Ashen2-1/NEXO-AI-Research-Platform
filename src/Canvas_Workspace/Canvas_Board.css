@@ -342,14 +342,8 @@ body,
 .Note_PDF_Preview {
     width: 100%;
     height: 100%;
-    border: 1px solid #d8d8d8;
-    background: white;
-}
-
-.Note_PDF_Preview iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
+    min-height: 0;
+    background: transparent;
 }
 
 .Note_Source_Text {
@@ -853,7 +847,7 @@ body,
 }
 
 .Note_Modal {
-    width: min(1000px, 94vw);
+    width: min(1320px, 96vw);
     height: min(900px, 90dvh);
 
     background-color: #f7f7f7;
@@ -921,7 +915,7 @@ body,
 .Note_Modal_Body {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
     min-height: 0;
 }
 

@@ -14,6 +14,7 @@ import aiRoutes from "./routes/aiRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
 import canvasRoutes from "./routes/canvasRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
+import pdfAnnotationRoutes from "./routes/pdfAnnotationRoutes.js";
 
 dotenv.config();
 
@@ -109,6 +110,7 @@ app.use("/api/links", linkRoutes);
 app.use("/api/canvases", canvasRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/feedback", feedbackRoutes);
+app.use("/api/pdf-annotations", pdfAnnotationRoutes);
 
 
 app.use((req, res) => {

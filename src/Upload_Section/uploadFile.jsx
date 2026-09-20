@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { buildApiUrl } from "../api.js";
+import { buildApiUrl, getAuthToken } from "../api.js";
 import "./uploadFile.css";
 
 
@@ -164,7 +164,7 @@ const getFileExtension = (
 
       xhr.open("POST", buildApiUrl("/files/ingest"));
 
-      const token = localStorage.getItem("nexo_token");
+      const token = getAuthToken();
 
       if (token) {
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);
