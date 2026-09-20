@@ -5,6 +5,7 @@ import UploadFile from "../Upload_Section/uploadFile.jsx";
 import DatabaseSearch from "../Upload_Section/databaseSearch.jsx";
 import "./Canvas_Board.css"
 import FrameworkPanel from "./FrameworkPanel.jsx";
+import PdfAnnotationViewer from "./PdfAnnotationViewer.jsx";
 //import { supabase } from "../lib/supabase";
 import {
     apiRequest,
@@ -5797,13 +5798,10 @@ ${frameworkEditorDraft.slice(0, 60000)}
                                         "pdf" &&
                                     openedNote.fileUrl ? (
                                         <div className="Note_PDF_Preview">
-                                            <iframe
-                                                src={
-                                                    openedNote.fileUrl
-                                                }
-                                                title={
-                                                    openedNote.title
-                                                }
+                                            <PdfAnnotationViewer
+                                                noteId={openedNote.id}
+                                                fileUrl={openedNote.fileUrl}
+                                                title={openedNote.title}
                                             />
                                         </div>
                                     ) : (

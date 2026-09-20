@@ -50,6 +50,11 @@ Current workflow supports:
 - indexing
 - source attachment to notes
 - document availability inside the workspace
+- selectable PDF text with persistent highlights, underlines, strikeouts, and comments
+
+PDF annotations are stored separately from the source file, so the original PDF
+remains unchanged. Run `npm run migrate` from `my-express-app/` before starting
+the backend after pulling annotation-related schema changes.
 
 ---
 
